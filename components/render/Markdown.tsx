@@ -11,7 +11,7 @@ type Props = { md: string };
 
 function MarkdownInner({ md }: Props) {
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none">
+    <div className="md-content">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
