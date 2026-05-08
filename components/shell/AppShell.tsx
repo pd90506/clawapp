@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { TopBar } from "./TopBar";
 import { LeftSidebar } from "./LeftSidebar";
 import { RightDrawer } from "./RightDrawer";
@@ -20,10 +20,13 @@ export function AppShell() {
   const health = useGatewayHealth();
   const gatewayDown = health !== null && !health.ok;
 
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return new URLSearchParams(window.location.search).get("session");
-  });
+  // Avoid SSR/CSR mismatch: start null and hydrate from URL after mount.
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("session");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (id) setActiveSessionId(id);
+  }, []);
   const [selectedAgent, setSelectedAgent] = useState<string>("main");
   const [refreshNonce, setRefreshNonce] = useState(0);
 

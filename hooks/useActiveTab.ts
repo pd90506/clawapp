@@ -3,17 +3,21 @@ import { useEffect, useState } from "react";
 
 export type Tab = "chat" | "channels";
 
-function read(): Tab {
+function readUrl(): Tab {
   if (typeof window === "undefined") return "chat";
   const t = new URLSearchParams(window.location.search).get("tab");
   return t === "channels" ? "channels" : "chat";
 }
 
 export function useActiveTab() {
-  const [tab, setTab] = useState<Tab>(() => read());
+  // Avoid SSR/CSR mismatch: start with "chat" default, hydrate from URL after mount.
+  const [tab, setTab] = useState<Tab>("chat");
 
   useEffect(() => {
-    const onPop = () => setTab(read());
+    const next = readUrl();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (next !== "chat") setTab(next);
+    const onPop = () => setTab(readUrl());
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
