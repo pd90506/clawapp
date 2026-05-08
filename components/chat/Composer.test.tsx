@@ -41,4 +41,30 @@ describe("Composer", () => {
     expect(screen.getByRole("textbox")).toBeDisabled();
     expect(screen.getByRole("button", { name: /send/i })).toBeDisabled();
   });
+
+  it("clicking / button shows the slash commands popup", async () => {
+    render(<Composer onSend={() => {}} disabled={false} />);
+    // Popup not shown initially
+    expect(screen.queryByText("/plan")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTitle("Slash command"));
+    expect(screen.getByText("/plan")).toBeInTheDocument();
+    expect(screen.getByText("/explain")).toBeInTheDocument();
+  });
+
+  it("clicking a slash command inserts /<cmd> into the textarea", async () => {
+    render(<Composer onSend={() => {}} disabled={false} />);
+    await userEvent.click(screen.getByTitle("Slash command"));
+    await userEvent.click(screen.getByRole("menuitem", { name: /\/plan/i }));
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+    expect(ta.value).toBe("/plan ");
+  });
+
+  it("clicking outside the popup closes it", async () => {
+    render(<Composer onSend={() => {}} disabled={false} />);
+    await userEvent.click(screen.getByTitle("Slash command"));
+    expect(screen.getByText("/plan")).toBeInTheDocument();
+    // Click outside (on the body)
+    await userEvent.click(document.body);
+    expect(screen.queryByText("/plan")).not.toBeInTheDocument();
+  });
 });
