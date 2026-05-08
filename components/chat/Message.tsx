@@ -6,21 +6,72 @@ import { ThinkingPanel } from "@/components/agent-trace/ThinkingPanel";
 
 export function Message({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
-  const align = isUser ? "items-end" : "items-start";
-  const bubble = isUser
-    ? "bg-[var(--accent-soft)] text-[var(--accent)] rounded-2xl px-4 py-2"
-    : "bg-transparent text-[var(--text-primary)]";
+
+  if (isUser) {
+    // User message: right-aligned bubble + avatar
+    const userInitial = "P"; // placeholder — no user profile in this app
+    return (
+      <div className="msg user">
+        <div className="msg-row">
+          <div>
+            {message.blocks.map((b, i) => {
+              if (b.kind === "text") {
+                return (
+                  <div key={i} className="bubble">
+                    <Markdown md={b.md} />
+                  </div>
+                );
+              }
+              return null;
+            })}
+            {message.error && (
+              <div className="bubble" style={{ color: "var(--err)", background: "transparent" }}>
+                Error: {message.error}
+              </div>
+            )}
+          </div>
+          <div className="msg-av user">{userInitial}</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Assistant message: avatar + body (no bubble, plain prose)
   return (
-    <div className={`flex flex-col ${align} my-3 px-6`}>
-      <div className={`max-w-[80%] ${bubble}`}>
+    <div className="msg asst">
+      <div className="msg-av">O</div>
+      <div className="msg-body">
+        <div className="msg-name">OpenClaw</div>
         {message.blocks.map((b, i) => {
-          if (b.kind === "text") return <Markdown key={i} md={b.md} />;
-          if (b.kind === "tool_call") return (
-            <ToolCallPanel key={i} name={b.name} args={b.args} done={b.done} result={b.result} error={b.error} />
-          );
-          return <ThinkingPanel key={i} text={b.text} done={b.done} />;
+          if (b.kind === "thinking") {
+            return <ThinkingPanel key={i} text={b.text} done={b.done} />;
+          }
+          if (b.kind === "tool_call") {
+            return (
+              <ToolCallPanel
+                key={i}
+                name={b.name}
+                args={b.args}
+                done={b.done}
+                result={b.result}
+                error={b.error}
+              />
+            );
+          }
+          if (b.kind === "text") {
+            return (
+              <div key={i} className="asst-text">
+                <Markdown md={b.md} />
+              </div>
+            );
+          }
+          return null;
         })}
-        {message.error && <div className="text-sm text-red-500 mt-2">Error: {message.error}</div>}
+        {message.error && (
+          <div className="annot" style={{ color: "var(--err)" }}>
+            Error: {message.error}
+          </div>
+        )}
       </div>
     </div>
   );

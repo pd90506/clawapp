@@ -5,29 +5,28 @@ type Props = { name: string; args: unknown; done: boolean; result?: unknown; err
 
 export function ToolCallPanel({ name, args, done, result, error }: Props) {
   const [open, setOpen] = useState(false);
+  const statusLabel = error ? "error" : done ? "done" : "running…";
+
   return (
-    <div className="my-2 border rounded-md text-sm">
+    <div className="tool-panel">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-3 py-2 text-left"
+        className="tool-panel-header"
       >
-        <span>
-          <span className="font-mono">{name}</span>
-          {" "}
-          <span className="text-zinc-500">
-            {error ? "error" : done ? "done" : "running…"}
-          </span>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span className="tool-panel-name">{name}</span>
+          <span className="tool-panel-status">{statusLabel}</span>
         </span>
         <span aria-hidden>{open ? "▾" : "▸"}</span>
       </button>
       {open && (
-        <div className="px-3 pb-3 space-y-2">
-          <pre className="text-xs bg-zinc-100 dark:bg-zinc-800 p-2 rounded overflow-x-auto">
+        <div className="tool-panel-body">
+          <pre className="tool-panel-pre">
             {JSON.stringify(args, null, 2)}
           </pre>
           {done && (
-            <pre className="text-xs bg-zinc-100 dark:bg-zinc-800 p-2 rounded overflow-x-auto">
+            <pre className="tool-panel-pre">
               {error ?? (typeof result === "string" ? result : JSON.stringify(result, null, 2))}
             </pre>
           )}
