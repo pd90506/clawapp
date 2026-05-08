@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useChat } from "@/hooks/useChat";
+import { useGatewayHealth } from "@/hooks/useGatewayHealth";
 import { MessageList } from "@/components/chat/MessageList";
 import { Composer } from "@/components/chat/Composer";
 import { StatusBanner } from "@/components/connection/StatusBanner";
@@ -11,6 +12,8 @@ type Props = { initialSessionId: string | null; sessions: SessionSummary[] };
 export function ChatPage({ initialSessionId, sessions }: Props) {
   const [sessionId, setSessionId] = useState(initialSessionId ?? "default");
   const { messages, status, send } = useChat(sessionId);
+  const health = useGatewayHealth();
+  const gatewayDown = health !== null && !health.ok;
 
   return (
     <div className="h-full flex flex-col">
@@ -33,7 +36,7 @@ export function ChatPage({ initialSessionId, sessions }: Props) {
         </aside>
         <main className="flex-1 flex flex-col">
           <MessageList messages={messages} status={status} />
-          <Composer onSend={send} disabled={status === "streaming"} />
+          <Composer onSend={send} disabled={status === "streaming" || gatewayDown} />
         </main>
       </div>
     </div>
