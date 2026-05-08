@@ -4,10 +4,10 @@ import userEvent from "@testing-library/user-event";
 import { RightDrawer } from "./RightDrawer";
 
 describe("RightDrawer", () => {
-  it("renders Desk and Note section headers", () => {
+  it("renders Output Files and Workspace tabs", () => {
     render(<RightDrawer onCollapse={() => {}} />);
-    expect(screen.getByText("Desk")).toBeInTheDocument();
-    expect(screen.getByText("Note")).toBeInTheDocument();
+    expect(screen.getByText("Output Files")).toBeInTheDocument();
+    expect(screen.getByText("Workspace")).toBeInTheDocument();
   });
   it("calls onCollapse when collapse button clicked", async () => {
     const onCollapse = vi.fn();
