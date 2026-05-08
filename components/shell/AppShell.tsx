@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { TopBar } from "./TopBar";
 import { LeftSidebar } from "./LeftSidebar";
 import { RightDrawer } from "./RightDrawer";
@@ -20,16 +20,12 @@ export function AppShell() {
   const health = useGatewayHealth();
   const gatewayDown = health !== null && !health.ok;
 
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("session");
+  });
   const [selectedAgent, setSelectedAgent] = useState<string>("main");
   const [refreshNonce, setRefreshNonce] = useState(0);
-
-  // Read ?session=<key> from URL on mount
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const sp = new URLSearchParams(window.location.search);
-    setActiveSessionId(sp.get("session"));
-  }, []);
 
   const setActive = useCallback((id: string | null) => {
     setActiveSessionId(id);

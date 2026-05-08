@@ -17,7 +17,8 @@ const POLL_MS = 30_000;
 
 export function SessionList({ activeSessionId, pinnedIds, onSelect, onTogglePin, now }: Props) {
   const [sessions, setSessions] = useState<SessionView[] | null>(null);
-  const referenceNow = now ?? Date.now();
+  const [mountNow] = useState<number>(() => now ?? Date.now());
+  const referenceNow = now ?? mountNow;
 
   useEffect(() => {
     let cancelled = false;
