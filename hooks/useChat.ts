@@ -19,6 +19,7 @@ export type Status = "idle" | "streaming" | "error";
 type ChatState = { messages: ChatMessage[]; status: Status };
 type ChatAction =
   | { type: "reset" }
+  | { type: "loadHistory"; messages: ChatMessage[] }
   | { type: "appendMessages"; userMsg: ChatMessage; asst: ChatMessage }
   | { type: "updateLast"; fn: (m: ChatMessage) => ChatMessage }
   | { type: "setStatus"; status: Status };
@@ -27,6 +28,8 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
     case "reset":
       return { messages: [], status: "idle" };
+    case "loadHistory":
+      return { messages: action.messages, status: "idle" };
     case "appendMessages":
       return { ...state, messages: [...state.messages, action.userMsg, action.asst] };
     case "updateLast": {
@@ -41,6 +44,22 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
   }
 }
 
+type HistoryRow = { role: "user" | "assistant" | "system"; text: string; at: number };
+
+function rowsToMessages(rows: HistoryRow[]): ChatMessage[] {
+  // Show user + assistant turns. Skip empty rows and non-user/assistant roles
+  // (tool results, compaction markers, etc.) — they're already represented by
+  // the assistant text or aren't useful as standalone bubbles.
+  const out: ChatMessage[] = [];
+  let i = 0;
+  for (const r of rows) {
+    if (r.role !== "user" && r.role !== "assistant") continue;
+    if (!r.text || r.text.trim().length === 0) continue;
+    out.push({ id: `h-${++i}-${r.at}`, role: r.role, blocks: [{ kind: "text", md: r.text }] });
+  }
+  return out;
+}
+
 export function useChat(sessionId: string) {
   const [{ messages, status }, dispatch] = useReducer(chatReducer, { messages: [], status: "idle" });
   const abortRef = useRef<AbortController | null>(null);
@@ -50,10 +69,21 @@ export function useChat(sessionId: string) {
   // Abort in-flight stream on unmount
   useEffect(() => () => { abortRef.current?.abort(); }, []);
 
-  // Abort and reset when sessionId changes
+  // Abort, reset, and load history when sessionId changes
   useEffect(() => {
     abortRef.current?.abort();
     dispatch({ type: "reset" });
+    if (!sessionId) return;
+    let cancelled = false;
+    fetch(`/api/sessions/${encodeURIComponent(sessionId)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((j: { messages?: HistoryRow[] }) => {
+        if (cancelled) return;
+        const ms = rowsToMessages(j.messages ?? []);
+        if (ms.length > 0) dispatch({ type: "loadHistory", messages: ms });
+      })
+      .catch(() => { /* keep empty buffer; status banner already covers errors */ });
+    return () => { cancelled = true; };
   }, [sessionId]);
 
   const updateLast = useCallback((fn: (m: ChatMessage) => ChatMessage) => {
