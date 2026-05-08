@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# clawapp
 
-## Getting Started
+A chat-first webapp for [openclaw](https://github.com/openclaw/openclaw) with rich markdown, code, math, image, and agent-trace rendering.
 
-First, run the development server:
+## Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Configuration is auto-discovered from `~/.openclaw/openclaw.json`. Override with `OPENCLAW_GATEWAY_URL` and `OPENCLAW_TOKEN` env vars (env takes precedence when both are set).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Test
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm test       # vitest unit + component tests
+pnpm test:e2e   # playwright smoke against a fake gateway
+pnpm typecheck  # tsc --noEmit
+pnpm build      # next build
+```
 
-## Learn More
+## Design
 
-To learn more about Next.js, take a look at the following resources:
+See [docs/superpowers/specs/2026-05-08-openclaw-webapp-chat-design.md](docs/superpowers/specs/2026-05-08-openclaw-webapp-chat-design.md) for the v1 design and [docs/superpowers/plans/2026-05-08-openclaw-webapp-chat.md](docs/superpowers/plans/2026-05-08-openclaw-webapp-chat.md) for the implementation plan.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## What's in scope (v1)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Polished chat with markdown, GFM tables, syntax-highlighted code (Shiki), KaTeX math, images.
+- Streamed responses via Server-Sent Events.
+- Visible agent traces: collapsible tool-call panels and thinking blocks.
+- openclaw is the source of truth for sessions and history (no local DB).
 
-## Deploy on Vercel
+## Out of scope (v1)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Configuration UI (agents, models, plugins, MCP).
+- Local persistence.
+- Message edit / regenerate.
+- File uploads, voice.
+- Multi-user / remote deployment.
