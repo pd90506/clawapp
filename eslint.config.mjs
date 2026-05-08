@@ -10,9 +10,12 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     ".next-e2e/**",
+    ".next-preview/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Claude Code worktrees / nested repos:
+    ".claude/**",
   ]),
 ]);
 
