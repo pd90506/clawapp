@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:ui": "vitest --ui",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -30,7 +31,6 @@
     "@vitest/ui": "^4.1.5",
     "eslint": "^9",
     "eslint-config-next": "16.2.5",
-    "happy-dom": "^20.9.0",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4",
     "typescript": "^5",
