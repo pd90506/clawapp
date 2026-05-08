@@ -1180,47 +1180,86 @@ input, textarea { font: inherit; color: inherit; }
 /* ============================================================
    Tool call / thinking panels — annot aesthetic
    ============================================================ */
-.tool-panel {
+
+/* Tool-use annotation — single-line row with expandable detail */
+.annot.tool {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
   margin: 6px 0;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--line);
-  background: var(--paper-elev);
+  padding: 7px 10px 7px 12px;
+  border-left: 2px solid var(--accent);
+  background: var(--paper-sunk);
+  border-radius: 0 6px 6px 0;
   font-size: 13px;
+  color: var(--ink-2);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.annot.tool::before { content: ''; margin: 0; }
+.annot.tool .tool-icon { font-size: 14px; flex-shrink: 0; }
+.annot.tool .tool-actor { font-weight: 600; color: var(--ink-1); flex-shrink: 0; }
+.annot.tool .tool-verb { color: var(--ink-2); flex-shrink: 0; }
+.annot.tool .tool-args {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
 }
-.tool-panel-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 10px;
-  cursor: pointer;
-  color: var(--ink-2);
-  gap: 8px;
-}
-.tool-panel-header:hover { background: var(--paper-sunk); }
-.tool-panel-name {
+.annot.tool .tool-arg {
   font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--ink-2);
-}
-.tool-panel-status {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--ink-3);
-  font-style: italic;
-}
-.tool-panel-body {
-  padding: 0 10px 10px;
-}
-.tool-panel-pre {
-  background: var(--paper-soft);
+  background: var(--paper);
+  padding: 1px 6px;
+  border-radius: 3px;
   border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  padding: 8px 10px;
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--ink-2);
-  overflow-x: auto;
-  white-space: pre;
-  margin-top: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  flex-shrink: 1;
 }
+.annot.tool .tool-status { margin-left: auto; font-family: var(--font-mono); flex-shrink: 0; padding-left: 4px; }
+.annot.tool .tool-status.ok { color: var(--ok, #4a7d65); }
+.annot.tool .tool-status.err { color: var(--err, #b85a5a); }
+.annot.tool .tool-status.run { color: var(--ink-4); }
+.annot.tool.expandable { cursor: pointer; }
+.annot.tool.expandable:hover { background: color-mix(in oklch, var(--paper-sunk) 80%, var(--ink-1) 4%); }
+.annot.tool .tool-caret {
+  font-style: normal;
+  color: var(--ink-4);
+  font-size: 13px;
+  width: 10px;
+  display: inline-flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.annot.tool-wrap { display: block; padding: 0; background: transparent; border: 0; }
+.annot.tool-wrap::before { content: ''; margin: 0; }
+.tool-detail {
+  margin: 4px 0 8px 4px;
+  padding: 6px 0 6px 18px;
+  border-left: 2px solid var(--line-strong, var(--line));
+  font-size: 12.5px;
+  color: var(--ink-3);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tool-detail-line { font-style: italic; line-height: 1.55; }
+.tool-detail-row {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.tool-detail-row .k { color: var(--ink-4); text-transform: uppercase; letter-spacing: 0.06em; font-size: 10.5px; align-self: center; }
+.tool-detail-row .v { color: var(--ink-2); word-break: break-all; }
 
 .thinking-panel {
   margin: 6px 0;
