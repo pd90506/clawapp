@@ -8,13 +8,16 @@ type Props = {
   pinnedIds: Set<string>;
   onSelectSession: (id: string) => void;
   onTogglePin: (id: string) => void;
+  onDeleteSession: (id: string) => void;
   onNewChat: () => void;
   onCollapse: () => void;
   newChatDisabled: boolean;
+  refreshNonce?: number;
 };
 
 export function LeftSidebar({
-  activeSessionId, pinnedIds, onSelectSession, onTogglePin, onNewChat, onCollapse, newChatDisabled,
+  activeSessionId, pinnedIds, onSelectSession, onTogglePin, onDeleteSession,
+  onNewChat, onCollapse, newChatDisabled, refreshNonce,
 }: Props) {
   return (
     <aside className="w-[280px] shrink-0 bg-[var(--bg-card)] border-r border-[var(--border-soft)] flex flex-col">
@@ -26,6 +29,8 @@ export function LeftSidebar({
           pinnedIds={pinnedIds}
           onSelect={onSelectSession}
           onTogglePin={onTogglePin}
+          onDelete={onDeleteSession}
+          refreshNonce={refreshNonce}
         />
       </div>
     </aside>

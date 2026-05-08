@@ -48,6 +48,16 @@ export function AppShell() {
     } catch { /* non-fatal */ }
   }, [gatewayDown, setActive]);
 
+  const onDeleteSession = useCallback(async (id: string) => {
+    if (gatewayDown) return;
+    try {
+      const r = await fetch(`/api/sessions/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!r.ok) return;
+      if (activeSessionId === id) setActive(null);
+      setRefreshNonce((n) => n + 1);
+    } catch { /* non-fatal */ }
+  }, [gatewayDown, activeSessionId, setActive]);
+
   return (
     <div className="h-full flex flex-col">
       <StatusBanner />
@@ -62,14 +72,15 @@ export function AppShell() {
       <div className="flex-1 flex overflow-hidden">
         {sidebars.left ? (
           <LeftSidebar
-            key={refreshNonce}
             activeSessionId={activeSessionId}
             pinnedIds={pinnedIds}
             onSelectSession={setActive}
             onTogglePin={togglePin}
+            onDeleteSession={onDeleteSession}
             onNewChat={onNewChat}
             onCollapse={sidebars.toggleLeft}
             newChatDisabled={gatewayDown}
+            refreshNonce={refreshNonce}
           />
         ) : (
           <SidebarToggleOverlay side="left" onClick={sidebars.toggleLeft} />

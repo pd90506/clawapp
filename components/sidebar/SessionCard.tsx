@@ -16,15 +16,16 @@ type Props = {
   pinned: boolean;
   onSelect: (id: string) => void;
   onTogglePin: (id: string) => void;
+  onDelete: (id: string) => void;
 };
 
-export function SessionCard({ session, active, pinned, onSelect, onTogglePin }: Props) {
+export function SessionCard({ session, active, pinned, onSelect, onTogglePin, onDelete }: Props) {
   const v = agentVisual(session.agentId);
   return (
     <div
       onContextMenu={(e) => { e.preventDefault(); onTogglePin(session.id); }}
       onClick={() => onSelect(session.id)}
-      className={`flex items-start gap-3 px-3 py-2 rounded-xl cursor-pointer transition-colors ${
+      className={`group relative flex items-start gap-3 px-3 py-2 rounded-xl cursor-pointer transition-colors ${
         active ? "bg-[var(--bg-active)]" : "hover:bg-[var(--bg-hover)]"
       }`}
     >
@@ -45,6 +46,19 @@ export function SessionCard({ session, active, pinned, onSelect, onTogglePin }: 
           {session.agentId}{session.model ? ` · ${session.model}` : ""} · {formatRelativeTime(session.at)}
         </div>
       </div>
+      <button
+        type="button"
+        aria-label="Delete chat"
+        title="Delete chat"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (typeof window !== "undefined" && !window.confirm(`Delete "${session.title}"? This cannot be undone.`)) return;
+          onDelete(session.id);
+        }}
+        className="absolute right-2 top-2 w-6 h-6 rounded-md grid place-items-center text-[var(--text-faint)] opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-active)] hover:text-[var(--text-primary)] transition-opacity"
+      >
+        <span aria-hidden className="text-base leading-none">×</span>
+      </button>
     </div>
   );
 }

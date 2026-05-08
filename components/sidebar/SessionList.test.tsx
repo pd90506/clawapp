@@ -14,7 +14,7 @@ describe("SessionList", () => {
       ]}), { status: 200 }),
     ));
     // The component derives `at` & agentId for now from constants; real backend hooks land in Task 14.
-    render(<SessionList activeSessionId={null} pinnedIds={new Set(["web:3"])} onSelect={() => {}} onTogglePin={() => {}} now={NOW} />);
+    render(<SessionList activeSessionId={null} pinnedIds={new Set(["web:3"])} onSelect={() => {}} onTogglePin={() => {}} onDelete={() => {}} now={NOW} />);
     await waitFor(() => expect(screen.getByText("Pinned C")).toBeInTheDocument());
     expect(screen.getAllByText(/Pinned/i).length).toBeGreaterThan(0);
     expect(screen.getByText("Today A")).toBeInTheDocument();
@@ -24,7 +24,7 @@ describe("SessionList", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ sessions: [{ id: "web:1", title: "Today A" }] }), { status: 200 }),
     ));
-    render(<SessionList activeSessionId={null} pinnedIds={new Set()} onSelect={() => {}} onTogglePin={() => {}} now={NOW} />);
+    render(<SessionList activeSessionId={null} pinnedIds={new Set()} onSelect={() => {}} onTogglePin={() => {}} onDelete={() => {}} now={NOW} />);
     await waitFor(() => expect(screen.getByText("Today A")).toBeInTheDocument());
     expect(screen.queryByText(/Pinned/i)).toBeNull();
   });

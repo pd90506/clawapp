@@ -8,6 +8,8 @@ type Props = {
   pinnedIds: Set<string>;
   onSelect: (id: string) => void;
   onTogglePin: (id: string) => void;
+  onDelete: (id: string) => void;
+  refreshNonce?: number;
   now?: number;
 };
 
@@ -15,7 +17,7 @@ type RawSession = { id: string; title: string; agentId?: string; model?: string;
 
 const POLL_MS = 30_000;
 
-export function SessionList({ activeSessionId, pinnedIds, onSelect, onTogglePin, now }: Props) {
+export function SessionList({ activeSessionId, pinnedIds, onSelect, onTogglePin, onDelete, refreshNonce = 0, now }: Props) {
   const [sessions, setSessions] = useState<SessionView[] | null>(null);
   const [mountNow] = useState<number>(() => now ?? Date.now());
   const referenceNow = now ?? mountNow;
@@ -41,7 +43,7 @@ export function SessionList({ activeSessionId, pinnedIds, onSelect, onTogglePin,
     load();
     const id = setInterval(load, POLL_MS);
     return () => { cancelled = true; clearInterval(id); };
-  }, [referenceNow]);
+  }, [referenceNow, refreshNonce]);
 
   if (sessions === null) return <div className="px-3 py-2 text-xs text-[var(--text-faint)]">Loading…</div>;
   if (sessions.length === 0) return <div className="px-3 py-2 text-xs text-[var(--text-faint)]">No sessions yet</div>;
@@ -60,6 +62,7 @@ export function SessionList({ activeSessionId, pinnedIds, onSelect, onTogglePin,
               pinned={pinnedIds.has(s.id)}
               onSelect={onSelect}
               onTogglePin={onTogglePin}
+              onDelete={onDelete}
             />
           ))}
         </SessionGroup>

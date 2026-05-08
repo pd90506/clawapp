@@ -17,6 +17,7 @@ export type Client = {
   listAgents(): Promise<AgentSummary[]>;
   createSession(opts?: { label?: string; agentId?: string }): Promise<SessionSummary>;
   patchSessionLabel(sessionId: string, label: string): Promise<void>;
+  deleteSession(sessionId: string): Promise<void>;
 };
 
 type RawSessionRow = {
@@ -125,15 +126,19 @@ export function createClient(conn: GatewayConnection): Client {
   }
 
   async function createSession(opts?: { label?: string; agentId?: string }): Promise<SessionSummary> {
-    const key = `web:${randomUUID()}`;
+    const uuid = randomUUID();
+    const key = `web:${uuid}`;
+    // openclaw rejects duplicate labels; suffix the default so concurrent "New chat"
+    // creations don't collide. The auto-label flow rewrites this on first message.
+    const label = opts?.label ?? `New chat ${uuid.slice(0, 4)}`;
     const p = await conn.invoke("sessions.create", {
       key,
       agentId: opts?.agentId ?? "main",
-      label: opts?.label ?? "New chat",
+      label,
     }) as { key?: string; displayName?: string; derivedTitle?: string; label?: string };
     return {
       id: p.key ?? key,
-      title: p.displayName ?? p.derivedTitle ?? p.label ?? "New chat",
+      title: p.displayName ?? p.derivedTitle ?? p.label ?? label,
     };
   }
 
@@ -141,5 +146,9 @@ export function createClient(conn: GatewayConnection): Client {
     await conn.invoke("sessions.patch", { key: sessionId, label });
   }
 
-  return { listSessions, getHistory, health, sendMessage, listAgents, createSession, patchSessionLabel };
+  async function deleteSession(sessionId: string): Promise<void> {
+    await conn.invoke("sessions.delete", { key: sessionId, deleteTranscript: true });
+  }
+
+  return { listSessions, getHistory, health, sendMessage, listAgents, createSession, patchSessionLabel, deleteSession };
 }
