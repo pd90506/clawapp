@@ -17,11 +17,6 @@ export function TopBar({ tab, onTabChange, leftOpen: _l, rightOpen: _r, onToggle
   return (
     <div className="titlebar">
       <div className="tb-left">
-        <div className="traffic">
-          <span className="dot r" />
-          <span className="dot y" />
-          <span className="dot g" />
-        </div>
         <button
           type="button"
           aria-label="Toggle left sidebar"
