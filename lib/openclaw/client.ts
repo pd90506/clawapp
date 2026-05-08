@@ -1,5 +1,7 @@
+import WebSocket from "ws";
 import type { GatewayConfig } from "./config";
 import type { StreamEvent } from "./events";
+import { parseStreamEvent } from "./events";
 
 export type SessionSummary = { id: string; title: string };
 export type Message = { role: "user" | "assistant" | "system"; text: string; at: number };
@@ -37,9 +39,56 @@ export function createClient(cfg: GatewayConfig): Client {
     }
   }
 
-  // sendMessage WS streaming will be added in Task 6.
-  async function* sendMessage(): AsyncIterable<StreamEvent> {
-    throw new Error("not implemented yet");
+  async function* sendMessage(
+    sessionId: string,
+    text: string,
+    signal?: AbortSignal,
+  ): AsyncIterable<StreamEvent> {
+    const wsUrl = cfg.url.replace(/^http/, "ws") + "/chat";
+    const ws = new WebSocket(wsUrl, { headers });
+
+    const queue: StreamEvent[] = [];
+    let waiter: ((v: void) => void) | null = null;
+    let closed = false;
+
+    const wake = () => { waiter?.(); waiter = null; };
+    ws.on("open", () => ws.send(JSON.stringify({ sessionId, text })));
+    ws.on("message", (data) => {
+      let parsed: unknown;
+      try { parsed = JSON.parse(data.toString()); } catch { return; }
+      const ev = parseStreamEvent(parsed);
+      if (!ev) return;
+      queue.push(ev);
+      if (ev.type === "done" || ev.type === "error") closed = true;
+      wake();
+    });
+    ws.on("close", () => {
+      if (!closed) {
+        queue.push({ type: "error", message: "connection closed" });
+        closed = true;
+      }
+      wake();
+    });
+    ws.on("error", (e) => {
+      queue.push({ type: "error", message: (e as Error).message });
+      closed = true;
+      wake();
+    });
+    signal?.addEventListener("abort", () => { try { ws.close(); } catch {} });
+
+    try {
+      while (true) {
+        while (queue.length) {
+          const ev = queue.shift()!;
+          yield ev;
+          if (ev.type === "done" || ev.type === "error") return;
+        }
+        if (closed) return;
+        await new Promise<void>((res) => { waiter = res; });
+      }
+    } finally {
+      try { ws.close(); } catch {}
+    }
   }
 
   return { listSessions, getHistory, health, sendMessage };
