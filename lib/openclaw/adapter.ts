@@ -31,7 +31,7 @@ export function adaptTranscriptEvent(
     // phase === "result"
     if (d.isError === true) {
       return {
-        out: [{ type: "tool_result", id: d.toolCallId, error: d.meta ?? "tool error" }],
+        out: [{ type: "tool_result", id: d.toolCallId, result: undefined, error: d.meta ?? "tool error" }],
         next: state,
       };
     }
