@@ -83,7 +83,7 @@ body {
   color: var(--text-primary);
 }
 
-/* Code blocks */
+/* Code blocks (non-shiki fallback or inline-pre) */
 .md-content pre {
   background: var(--bg-subtle);
   border: 1px solid var(--border-soft);
@@ -102,8 +102,26 @@ body {
   color: var(--text-primary);
 }
 
-/* Shiki output — neutralize its own background so it sits on our card */
-.md-content pre.shiki { background: var(--bg-subtle); }
+/* Shiki-rendered code blocks: same cream frame as native .md-content pre */
+.md-content .md-shiki { margin: 0.75rem 0; }
+.md-content .md-shiki pre.shiki {
+  background: var(--bg-subtle) !important;
+  border: 1px solid var(--border-soft);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  line-height: 1.5;
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+}
+.md-content .md-shiki pre.shiki code { background: transparent; padding: 0; }
+.md-content .md-shiki pre.shiki span { font-family: var(--font-mono); }
+@media (prefers-color-scheme: dark) {
+  /* Shiki's dual-theme output uses span style attrs; the prefers-dark variant
+   * is applied via a class. Use the dark color tokens by switching its
+   * background to our dark card token. Token spans keep their own dark colors. */
+  .md-content .md-shiki pre.shiki { background: var(--bg-subtle) !important; }
+}
 
 /* Blockquote */
 .md-content blockquote {

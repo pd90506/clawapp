@@ -21,6 +21,9 @@ function MarkdownInner({ md }: Props) {
             // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
             <img {...props} loading="lazy" referrerPolicy="no-referrer" className="max-w-full rounded" />
           ),
+          // Suppress the outer <pre> for fenced blocks — CodeBlock renders its
+          // own <pre class="shiki">. For non-fenced uses (rare), keep the pre.
+          pre: ({ children }) => <>{children}</>,
           code({ className, children, ...rest }) {
             const text = String(children).replace(/\n$/, "");
             const m = /language-(\w+)/.exec(className ?? "");
