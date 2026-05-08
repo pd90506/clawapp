@@ -494,9 +494,12 @@ input, textarea { font: inherit; color: inherit; }
   font-size: 14.5px;
   line-height: 1.7;
   color: var(--ink);
-  white-space: pre-wrap;
   text-wrap: pretty;
 }
+/* IMPORTANT: do NOT set white-space:pre-wrap here. .md-content nests inside
+ * .asst-text and contains the markdown render (with \n text nodes between
+ * sibling block elements). pre-wrap would render those \n as visible line
+ * breaks, inflating every inter-paragraph gap by ~24px. */
 .asst-text p { margin: 0 0 8px 0; }
 .asst-text p:last-child { margin: 0; }
 
