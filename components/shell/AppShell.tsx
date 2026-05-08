@@ -15,7 +15,8 @@ import { useGatewayHealth } from "@/hooks/useGatewayHealth";
 export function AppShell() {
   const sidebars = useSidebarState();
   const { tab, setTab } = useActiveTab();
-  const { isPinned, togglePin } = usePinnedSessions();
+  const { isPinned: _isPinned, togglePin, pinnedIds } = usePinnedSessions();
+  void _isPinned;
   const health = useGatewayHealth();
   const gatewayDown = health !== null && !health.ok;
 
@@ -51,11 +52,6 @@ export function AppShell() {
     } catch { /* non-fatal */ }
   }, [gatewayDown, setActive]);
 
-  const pinnedSet = new Set<string>();
-  // Materialize pinned set lazily — we only need .has()
-  const pinnedAdapter = { has: (id: string) => isPinned(id), add: () => undefined, delete: () => undefined } as unknown as Set<string>;
-  void pinnedSet;
-
   return (
     <div className="h-full flex flex-col">
       <StatusBanner />
@@ -72,7 +68,7 @@ export function AppShell() {
           <LeftSidebar
             key={refreshNonce}
             activeSessionId={activeSessionId}
-            pinnedIds={pinnedAdapter}
+            pinnedIds={pinnedIds}
             onSelectSession={setActive}
             onTogglePin={togglePin}
             onNewChat={onNewChat}

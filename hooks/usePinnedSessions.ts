@@ -31,5 +31,5 @@ export function usePinnedSessions() {
     });
   }, []);
 
-  return { isPinned, togglePin };
+  return { isPinned, togglePin, pinnedIds: pinned };
 }
