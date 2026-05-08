@@ -2,34 +2,116 @@ import http from "node:http";
 import { WebSocketServer } from "ws";
 
 export async function startFakeGateway(port: number, token: string) {
-  const server = http.createServer((req, res) => {
-    if (req.headers.authorization !== `Bearer ${token}`) {
-      res.statusCode = 401; res.end(); return;
-    }
-    if (req.url === "/health") { res.statusCode = 200; res.end("ok"); return; }
-    if (req.url === "/sessions") {
-      res.setHeader("content-type", "application/json");
-      res.end(JSON.stringify({ sessions: [{ id: "s1", title: "Test" }] }));
-      return;
-    }
-    if (req.url?.startsWith("/sessions/")) {
-      res.setHeader("content-type", "application/json");
-      res.end(JSON.stringify({ messages: [] }));
-      return;
-    }
-    res.statusCode = 404; res.end();
-  });
-  const wss = new WebSocketServer({ server, path: "/chat" });
-  wss.on("connection", (ws, req) => {
-    if (req.headers.authorization !== `Bearer ${token}`) { ws.close(); return; }
-    ws.on("message", () => {
-      ws.send(JSON.stringify({ type: "token", text: "hello " }));
-      ws.send(JSON.stringify({ type: "tool_call", id: "t1", name: "search", args: { q: "x" } }));
-      ws.send(JSON.stringify({ type: "tool_result", id: "t1", result: "ok" }));
-      ws.send(JSON.stringify({ type: "token", text: "world" }));
-      ws.send(JSON.stringify({ type: "done" }));
+  const server = http.createServer((_req, res) => { res.statusCode = 404; res.end(); });
+  const wss = new WebSocketServer({ server });
+
+  wss.on("connection", (ws) => {
+    let connected = false;
+
+    ws.send(JSON.stringify({
+      type: "event", event: "connect.challenge", payload: { nonce: "n", ts: Date.now() },
+    }));
+
+    ws.on("message", (raw) => {
+      let f: { type?: string; id?: string; method?: string; params?: unknown };
+      try { f = JSON.parse(String(raw)); } catch { return; }
+
+      // Handshake
+      if (!connected && f.type === "req" && f.method === "connect") {
+        const t = (f.params as { auth?: { token?: string } } | undefined)?.auth?.token;
+        if (t !== token) {
+          ws.send(JSON.stringify({ type: "res", id: f.id, ok: false, error: { message: "bad-token" } }));
+          ws.close();
+          return;
+        }
+        ws.send(JSON.stringify({
+          type: "res", id: f.id, ok: true,
+          payload: {
+            type: "hello-ok", protocol: 3,
+            server: { version: "fake", connId: "c1" },
+            features: { methods: [], events: ["session.message", "session.tool", "chat"] },
+            snapshot: {},
+            policy: { maxPayload: 1_048_576, maxBufferedBytes: 1_048_576, tickIntervalMs: 30_000 },
+            auth: { role: "operator", scopes: ["operator.read", "operator.write"] },
+          },
+        }));
+        connected = true;
+        return;
+      }
+
+      if (!connected || f.type !== "req") return;
+
+      const params = f.params as Record<string, unknown> | undefined;
+
+      if (f.method === "sessions.list") {
+        ws.send(JSON.stringify({ type: "res", id: f.id, ok: true, payload: {
+          ts: Date.now(), path: "fake", count: 1, totalCount: 1, limitApplied: false, hasMore: false, defaults: {},
+          sessions: [{ key: "main", displayName: "Test", hasActiveRun: false }],
+        }}));
+        return;
+      }
+      if (f.method === "chat.history") {
+        ws.send(JSON.stringify({ type: "res", id: f.id, ok: true, payload: {
+          sessionKey: "main", sessionId: undefined, messages: [],
+          thinkingLevel: undefined, fastMode: undefined, verboseLevel: undefined,
+        }}));
+        return;
+      }
+      if (f.method === "health") {
+        ws.send(JSON.stringify({ type: "res", id: f.id, ok: true, payload: { ok: true, ts: Date.now() } }));
+        return;
+      }
+      if (f.method === "sessions.messages.subscribe" || f.method === "sessions.subscribe") {
+        const key = (params as { key?: string } | undefined)?.key ?? "main";
+        ws.send(JSON.stringify({ type: "res", id: f.id, ok: true, payload: { subscribed: true, key } }));
+        return;
+      }
+      if (f.method === "sessions.messages.unsubscribe" || f.method === "sessions.unsubscribe") {
+        const key = (params as { key?: string } | undefined)?.key ?? "main";
+        ws.send(JSON.stringify({ type: "res", id: f.id, ok: true, payload: { subscribed: false, key } }));
+        return;
+      }
+      if (f.method === "chat.send") {
+        const sessionKey = (params as { sessionKey?: string } | undefined)?.sessionKey ?? "main";
+        ws.send(JSON.stringify({ type: "res", id: f.id, ok: true, payload: { runId: "r1", status: "started" } }));
+        // Drive a streamed agent turn via chat events with accumulated text
+        setTimeout(() => {
+          // chat delta 1: "hello "
+          ws.send(JSON.stringify({ type: "event", event: "chat", payload: {
+            runId: "r1", sessionKey, seq: 1, state: "delta",
+            message: { role: "assistant", content: [{ type: "text", text: "hello " }], timestamp: Date.now() },
+          }}));
+          // tool start
+          ws.send(JSON.stringify({ type: "event", event: "session.tool", payload: {
+            runId: "r1", seq: 1, stream: "tool", ts: Date.now(), sessionKey,
+            data: { phase: "start", name: "search", toolCallId: "t1", args: { q: "x" } },
+          }}));
+          // tool result
+          ws.send(JSON.stringify({ type: "event", event: "session.tool", payload: {
+            runId: "r1", seq: 2, stream: "tool", ts: Date.now(), sessionKey,
+            data: { phase: "result", name: "search", toolCallId: "t1", isError: false, result: "ok" },
+          }}));
+          // chat delta 2: "hello world"
+          ws.send(JSON.stringify({ type: "event", event: "chat", payload: {
+            runId: "r1", sessionKey, seq: 4, state: "delta",
+            message: { role: "assistant", content: [{ type: "text", text: "hello world" }], timestamp: Date.now() },
+          }}));
+          // chat final
+          ws.send(JSON.stringify({ type: "event", event: "chat", payload: {
+            runId: "r1", sessionKey, seq: 5, state: "final",
+            message: { role: "assistant", content: [{ type: "text", text: "hello world" }], timestamp: Date.now() },
+          }}));
+        }, 50);
+        return;
+      }
+      if (f.method === "chat.abort") {
+        ws.send(JSON.stringify({ type: "res", id: f.id, ok: true, payload: { ok: true, aborted: true, runIds: ["r1"] } }));
+        return;
+      }
+      ws.send(JSON.stringify({ type: "res", id: f.id, ok: false, error: { message: "method not implemented in fake" } }));
     });
   });
+
   await new Promise<void>((res) => server.listen(port, "127.0.0.1", () => res()));
   return () => new Promise<void>((res) => server.close(() => res()));
 }
