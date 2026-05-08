@@ -605,6 +605,21 @@ input, textarea { font: inherit; color: inherit; }
   color: var(--ink);
   border-color: var(--line);
 }
+.msg-actions .copy-msg {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--ink-3);
+  border: 1px solid transparent;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.msg-actions .copy-msg:hover {
+  background: var(--paper-elev);
+  color: var(--ink);
+  border-color: var(--line);
+}
 
 /* Empty state */
 .empty {
