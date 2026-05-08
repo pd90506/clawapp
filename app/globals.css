@@ -1,26 +1,39 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --bg-base: #f6f1e7;
+  --bg-card: #fbf7ee;
+  --bg-elevated: #ffffff;
+  --bg-hover: rgba(60, 40, 20, 0.04);
+  --bg-active: rgba(60, 40, 20, 0.08);
+  --border-soft: rgba(60, 40, 20, 0.08);
+  --text-primary: #2c3142;
+  --text-muted: #7a7568;
+  --text-faint: #a39d8c;
+  --accent: #4a6b8a;
+  --accent-soft: #d8e2eb;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg-base: #18181b;
+    --bg-card: #1f1f23;
+    --bg-elevated: #27272a;
+    --bg-hover: rgba(255, 255, 255, 0.04);
+    --bg-active: rgba(255, 255, 255, 0.08);
+    --border-soft: rgba(255, 255, 255, 0.06);
+    --text-primary: #e4e4e7;
+    --text-muted: #a1a1aa;
+    --text-faint: #71717a;
+    --accent: #7aa3c8;
+    --accent-soft: rgba(122, 163, 200, 0.18);
   }
 }
 
+html, body { height: 100%; }
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
