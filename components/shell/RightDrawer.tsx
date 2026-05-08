@@ -1,35 +1,15 @@
 "use client";
-import { useState } from "react";
 import { BoltIcon, SearchIcon, FolderIcon, FilterIcon, SortIcon } from "./Icons";
 
 type Props = { onCollapse: () => void };
 
 export function RightDrawer({ onCollapse }: Props) {
-  const [tab, setTab] = useState<"files" | "ws">("files");
-
   return (
     <aside className="rpanel">
       <div className="rpanel-head">
         <div className="title">OpenClaw</div>
         <button type="button" className="skill-chip" onClick={onCollapse} aria-label="Collapse desk">
           <BoltIcon size={12} /> Project skills
-        </button>
-      </div>
-
-      <div className="rp-tabs">
-        <button
-          type="button"
-          className={tab === "files" ? "on" : ""}
-          onClick={() => setTab("files")}
-        >
-          Output Files
-        </button>
-        <button
-          type="button"
-          className={tab === "ws" ? "on" : ""}
-          onClick={() => setTab("ws")}
-        >
-          Workspace
         </button>
       </div>
 
