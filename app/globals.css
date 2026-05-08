@@ -1099,7 +1099,7 @@ input, textarea { font: inherit; color: inherit; }
   margin: 0;
   padding: 12px 14px;
   overflow-x: auto;
-  font-size: 12.5px;
+  font-size: 13.5px;
   line-height: 1.55;
   color: var(--ink);
   background: transparent;
@@ -1114,6 +1114,12 @@ input, textarea { font: inherit; color: inherit; }
 }
 .md-content .codeblock-body { padding: 12px 14px; overflow-x: auto; }
 .md-content .codeblock-body pre.shiki { padding: 0; }
+/* Override the 0.82em from the generic .md-content pre code rule —
+ * inside a .codeblock the inner <code> should inherit the pre's size, not
+ * shrink further. */
+.md-content .codeblock pre code,
+.md-content .codeblock-body code,
+.md-content .codeblock-body code span { font-size: 1em; }
 
 /* Blockquote */
 .md-content blockquote {
