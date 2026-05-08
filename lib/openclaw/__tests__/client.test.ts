@@ -183,3 +183,29 @@ describe("createClient — listAgents and createSession", () => {
     await conn.close();
   });
 });
+
+describe("createClient — listModels", () => {
+  it("returns models with isDefault flag derived from defaultModel field", async () => {
+    gw.onClient((c) => {
+      c.onRequest(async (method) => {
+        if (method === "models.list") return { ok: true, payload: {
+          defaultModel: "kimi/kimi-code",
+          models: [
+            { id: "kimi/kimi-code", alias: "Kimi" },
+            { id: "openai-codex/gpt-5.5", label: "GPT 5.5" },
+          ],
+        }};
+        return { ok: false, error: { message: "no" } };
+      });
+    });
+    const conn = GatewayConnection.fromConfig({ url: gw.httpUrl, token: "t", source: "file" });
+    await conn.ready();
+    const c = createClient(conn);
+    const out = await c.listModels();
+    expect(out).toEqual([
+      { id: "kimi/kimi-code", label: "Kimi", provider: undefined, isDefault: true },
+      { id: "openai-codex/gpt-5.5", label: "GPT 5.5", provider: undefined, isDefault: false },
+    ]);
+    await conn.close();
+  });
+});
