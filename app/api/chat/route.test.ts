@@ -45,4 +45,38 @@ describe("POST /api/chat", () => {
     const r = await POST(new Request("http://x", { method: "POST", body: "{}" }));
     expect(r.status).toBe(400);
   });
+
+  it("triggers patchSessionLabel after first send when label is 'New chat'", async () => {
+    const patchSessionLabel = vi.fn(async () => undefined);
+    vi.mocked(getClient).mockReturnValue({
+      listSessions: async () => [{ id: "web:abc", title: "New chat" }],
+      async *sendMessage() { yield { type: "done" } as const; },
+      patchSessionLabel,
+    } as never);
+    const r = await POST(new Request("http://x", {
+      method: "POST",
+      body: JSON.stringify({ sessionId: "web:abc", text: "Hello world" }),
+    }));
+    // Drain SSE
+    const reader = r.body!.getReader(); while (!(await reader.read()).done) { /* drain */ }
+    // Give the fire-and-forget patch a tick
+    await new Promise((res) => setTimeout(res, 30));
+    expect(patchSessionLabel).toHaveBeenCalledWith("web:abc", "Hello world");
+  });
+
+  it("does NOT patch when current title is not 'New chat'", async () => {
+    const patchSessionLabel = vi.fn(async () => undefined);
+    vi.mocked(getClient).mockReturnValue({
+      listSessions: async () => [{ id: "web:abc", title: "Already named" }],
+      async *sendMessage() { yield { type: "done" } as const; },
+      patchSessionLabel,
+    } as never);
+    const r = await POST(new Request("http://x", {
+      method: "POST",
+      body: JSON.stringify({ sessionId: "web:abc", text: "Hello" }),
+    }));
+    const reader = r.body!.getReader(); while (!(await reader.read()).done) { /* drain */ }
+    await new Promise((res) => setTimeout(res, 30));
+    expect(patchSessionLabel).not.toHaveBeenCalled();
+  });
 });

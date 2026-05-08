@@ -7,11 +7,17 @@ import type { GatewayConnection } from "./connection";
 export type SessionSummary = { id: string; title: string };
 export type Message = { role: "user" | "assistant" | "system"; text: string; at: number };
 
+export type AgentSummary = { id: string; label: string; model?: string };
+
 export type Client = {
   listSessions(): Promise<SessionSummary[]>;
   getHistory(sessionId: string): Promise<Message[]>;
   health(): Promise<{ ok: boolean; reason?: string }>;
   sendMessage(sessionId: string, text: string, signal?: AbortSignal): AsyncIterable<StreamEvent>;
+  listAgents(): Promise<AgentSummary[]>;
+  createSession(opts?: { label?: string; agentId?: string }): Promise<SessionSummary>;
+  patchSessionLabel(sessionId: string, label: string): Promise<void>;
+  deleteSession(sessionId: string): Promise<void>;
 };
 
 type RawSessionRow = {
@@ -110,5 +116,39 @@ export function createClient(conn: GatewayConnection): Client {
     }
   }
 
-  return { listSessions, getHistory, health, sendMessage };
+  async function listAgents(): Promise<AgentSummary[]> {
+    const p = await conn.invoke("agents.list", {}) as { agents?: { id?: string; label?: string; displayName?: string; name?: string; model?: string }[] };
+    return (p?.agents ?? []).map((a) => ({
+      id: a.id ?? "",
+      label: a.label ?? a.displayName ?? a.name ?? a.id ?? "",
+      model: a.model,
+    }));
+  }
+
+  async function createSession(opts?: { label?: string; agentId?: string }): Promise<SessionSummary> {
+    const uuid = randomUUID();
+    const key = `web:${uuid}`;
+    // openclaw rejects duplicate labels; suffix the default so concurrent "New chat"
+    // creations don't collide. The auto-label flow rewrites this on first message.
+    const label = opts?.label ?? `New chat ${uuid.slice(0, 4)}`;
+    const p = await conn.invoke("sessions.create", {
+      key,
+      agentId: opts?.agentId ?? "main",
+      label,
+    }) as { key?: string; displayName?: string; derivedTitle?: string; label?: string };
+    return {
+      id: p.key ?? key,
+      title: p.displayName ?? p.derivedTitle ?? p.label ?? label,
+    };
+  }
+
+  async function patchSessionLabel(sessionId: string, label: string): Promise<void> {
+    await conn.invoke("sessions.patch", { key: sessionId, label });
+  }
+
+  async function deleteSession(sessionId: string): Promise<void> {
+    await conn.invoke("sessions.delete", { key: sessionId, deleteTranscript: true });
+  }
+
+  return { listSessions, getHistory, health, sendMessage, listAgents, createSession, patchSessionLabel, deleteSession };
 }

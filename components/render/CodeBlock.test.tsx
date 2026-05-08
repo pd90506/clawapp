@@ -9,10 +9,13 @@ describe("CodeBlock", () => {
       expect(container.querySelector("pre.shiki")).not.toBeNull();
     }, { timeout: 5000 });
   });
-  it("falls back to plain pre for unknown language", async () => {
+  it("falls back to plain code for unknown language", async () => {
     const { container } = render(<CodeBlock lang="zzz" code={"hello"} />);
     await waitFor(() => {
-      expect(container.querySelector("pre")).not.toBeNull();
+      // Either Shiki's pre.shiki or our fallback <code>
+      const code = container.querySelector("pre.shiki, code");
+      expect(code).not.toBeNull();
+      expect(container.textContent).toContain("hello");
     }, { timeout: 5000 });
   });
 });

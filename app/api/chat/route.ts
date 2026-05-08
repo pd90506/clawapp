@@ -9,6 +9,21 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return new Response(JSON.stringify({ error: "bad-body" }), { status: 400 });
 
+  // Fire-and-forget auto-label for "New chat" sessions (default title from createSession
+  // is "New chat <4-char-suffix>", so we match the prefix).
+  const TITLE_PLACEHOLDER_PREFIX = "New chat";
+  const LABEL_MAX_CHARS = 40;
+  (async () => {
+    try {
+      const sessions = await c.listSessions();
+      const found = sessions.find((s) => s.id === parsed.data.sessionId);
+      if (found?.title.startsWith(TITLE_PLACEHOLDER_PREFIX)) {
+        const newLabel = parsed.data.text.slice(0, LABEL_MAX_CHARS);
+        await c.patchSessionLabel(parsed.data.sessionId, newLabel);
+      }
+    } catch { /* non-fatal */ }
+  })();
+
   const ac = new AbortController();
   req.signal.addEventListener("abort", () => ac.abort());
 

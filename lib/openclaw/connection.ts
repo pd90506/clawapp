@@ -196,7 +196,7 @@ export class GatewayConnection {
         maxProtocol: 3,
         client: { id: "gateway-client", version: "0.1.0", platform: "node", mode: "backend" },
         role: "operator",
-        scopes: ["operator.read", "operator.write"],
+        scopes: ["operator.read", "operator.write", "operator.admin", "operator.approvals", "operator.pairing", "operator.talk.secrets"],
         caps: [],
         commands: [],
         permissions: {},

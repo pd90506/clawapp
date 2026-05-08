@@ -30,6 +30,10 @@ The bearer token never reaches the browser. All gateway calls are server-side; t
 
 See [docs/openclaw-protocol-notes.md](docs/openclaw-protocol-notes.md) for the protocol map (frame envelopes, methods, events) we discovered while building this.
 
+## Sessions
+
+clawapp creates new sessions via openclaw's `sessions.create` and stores them in `~/.openclaw/agents/<agentId>/sessions/<uuid>.jsonl` — the same place CLI and Telegram sessions live. clawapp-created sessions use the key prefix `web:<uuid>` to distinguish them. The session label auto-updates from the first message you send (max 40 chars). Sessions you pin from the sidebar are kept in browser localStorage (per-device) until v1.3 surfaces a server-side pin store.
+
 ## Test
 
 ```bash
