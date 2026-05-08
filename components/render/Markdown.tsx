@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
+import { CodeBlock } from "./CodeBlock";
 
 type Props = { md: string };
 
@@ -22,13 +23,9 @@ function MarkdownInner({ md }: Props) {
           ),
           code({ className, children, ...rest }) {
             const text = String(children).replace(/\n$/, "");
-            const isBlock = /language-/.test(className ?? "");
-            if (!isBlock) return <code className={className} {...rest}>{text}</code>;
-            return (
-              <pre className="rounded-md p-3 overflow-x-auto bg-zinc-900 text-zinc-100 text-sm">
-                <code className={className}>{text}</code>
-              </pre>
-            );
+            const m = /language-(\w+)/.exec(className ?? "");
+            if (!m) return <code className={className} {...rest}>{text}</code>;
+            return <CodeBlock lang={m[1]} code={text} />;
           },
         }}
       >
