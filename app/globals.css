@@ -1004,7 +1004,7 @@ input, textarea { font: inherit; color: inherit; }
    ============================================================ */
 .md-content {
   font-family: var(--font-serif);
-  line-height: 1.75;
+  line-height: 1.6;
   color: var(--ink);
   font-size: 1rem;
 }
@@ -1012,7 +1012,7 @@ input, textarea { font: inherit; color: inherit; }
 .md-content > :first-child { margin-top: 0; }
 .md-content > :last-child { margin-bottom: 0; }
 
-.md-content p { margin: 0 0 0.5em 0; }
+.md-content p { margin: 0 0 0.3em 0; }
 .md-content p:last-child { margin-bottom: 0; }
 
 .md-content img {
