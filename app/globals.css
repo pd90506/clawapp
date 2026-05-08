@@ -1038,20 +1038,64 @@ input, textarea { font: inherit; color: inherit; }
   color: var(--ink);
 }
 
-/* Shiki-rendered code blocks */
-.md-content .md-shiki { margin: 0.75rem 0; }
-.md-content .md-shiki pre.shiki {
-  background: var(--paper-soft) !important;
+/* Code block — outer frame from design */
+.md-content .codeblock {
+  margin: 10px 0;
   border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
-  overflow-x: auto;
-  line-height: 1.5;
+  border-radius: 8px;
+  background: var(--paper-sunk);
+  overflow: hidden;
   font-family: var(--font-mono);
-  font-size: 0.82em;
 }
-.md-content .md-shiki pre.shiki code { background: transparent; padding: 0; }
-.md-content .md-shiki pre.shiki span { font-family: var(--font-mono); }
+.md-content .codeblock-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px 6px 12px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in oklch, var(--paper-sunk) 70%, var(--paper) 30%);
+}
+.md-content .codeblock-lang {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+.md-content .codeblock-copy {
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  background: transparent;
+  border: 0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.md-content .codeblock-copy:hover { background: var(--paper); color: var(--ink); }
+
+.md-content .codeblock pre {
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.md-content .codeblock pre.shiki {
+  background: transparent !important;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+.md-content .codeblock-body { padding: 12px 14px; overflow-x: auto; }
+.md-content .codeblock-body pre.shiki { padding: 0; }
 
 /* Blockquote */
 .md-content blockquote {
