@@ -1,7 +1,8 @@
-import WebSocket from "ws";
-import type { GatewayConfig } from "./config";
+import { randomUUID } from "node:crypto";
 import type { StreamEvent } from "./events";
-import { parseStreamEvent } from "./events";
+import { parseTranscriptEvent, extractMessageText } from "./events";
+import { adaptTranscriptEvent, initialAdapterState } from "./adapter";
+import type { GatewayConnection } from "./connection";
 
 export type SessionSummary = { id: string; title: string };
 export type Message = { role: "user" | "assistant" | "system"; text: string; at: number };
@@ -13,27 +14,49 @@ export type Client = {
   sendMessage(sessionId: string, text: string, signal?: AbortSignal): AsyncIterable<StreamEvent>;
 };
 
-export function createClient(cfg: GatewayConfig): Client {
-  const headers = { Authorization: `Bearer ${cfg.token}` };
+type RawSessionRow = {
+  key: string;
+  displayName?: string;
+  derivedTitle?: string;
+  label?: string;
+};
 
+type RawMessage = {
+  role?: string;
+  content?: string | { type: string; text?: string }[];
+  text?: string;
+  timestamp?: number;
+  at?: number;
+};
+
+function normalizeRole(role: string | undefined): Message["role"] {
+  if (role === "user" || role === "assistant" || role === "system") return role;
+  // Tool results, system compaction, etc. surface as system rows in our normalized view.
+  return "system";
+}
+
+export function createClient(conn: GatewayConnection): Client {
   async function listSessions(): Promise<SessionSummary[]> {
-    const r = await fetch(`${cfg.url}/sessions`, { headers });
-    if (!r.ok) throw new Error(`listSessions ${r.status}`);
-    const j = await r.json();
-    return j.sessions ?? [];
+    const p = await conn.invoke("sessions.list", { includeDerivedTitles: true }) as { sessions?: RawSessionRow[] };
+    return (p?.sessions ?? []).map((s) => ({
+      id: s.key,
+      title: s.displayName ?? s.derivedTitle ?? s.label ?? s.key,
+    }));
   }
 
   async function getHistory(sessionId: string): Promise<Message[]> {
-    const r = await fetch(`${cfg.url}/sessions/${encodeURIComponent(sessionId)}/history`, { headers });
-    if (!r.ok) throw new Error(`getHistory ${r.status}`);
-    const j = await r.json();
-    return j.messages ?? [];
+    const p = await conn.invoke("chat.history", { sessionKey: sessionId }) as { messages?: RawMessage[] };
+    return (p?.messages ?? []).map((m) => ({
+      role: normalizeRole(m.role),
+      text: extractMessageText({ content: m.content, text: m.text }),
+      at: m.timestamp ?? m.at ?? 0,
+    }));
   }
 
   async function health(): Promise<{ ok: boolean; reason?: string }> {
     try {
-      const r = await fetch(`${cfg.url}/health`, { headers });
-      return r.ok ? { ok: true } : { ok: false, reason: `HTTP ${r.status}` };
+      await conn.invoke("health", {});
+      return { ok: true };
     } catch (e) {
       return { ok: false, reason: (e as Error).message };
     }
@@ -44,50 +67,46 @@ export function createClient(cfg: GatewayConfig): Client {
     text: string,
     signal?: AbortSignal,
   ): AsyncIterable<StreamEvent> {
-    const wsUrl = cfg.url.replace(/^http/, "ws") + "/chat";
-    const ws = new WebSocket(wsUrl, { headers });
+    const sub = conn.subscribe(sessionId);
+    let state = initialAdapterState();
+    let aborted = false;
 
-    const queue: StreamEvent[] = [];
-    let waiter: ((v: void) => void) | null = null;
-    let closed = false;
-
-    const wake = () => { waiter?.(); waiter = null; };
-    ws.on("open", () => ws.send(JSON.stringify({ sessionId, text })));
-    ws.on("message", (data) => {
-      let parsed: unknown;
-      try { parsed = JSON.parse(data.toString()); } catch { return; }
-      const ev = parseStreamEvent(parsed);
-      if (!ev) return;
-      queue.push(ev);
-      if (ev.type === "done" || ev.type === "error") closed = true;
-      wake();
-    });
-    ws.on("close", () => {
-      if (!closed) {
-        queue.push({ type: "error", message: "connection closed" });
-        closed = true;
+    if (signal) {
+      if (signal.aborted) {
+        await sub.unsubscribe();
+        yield { type: "error", message: "aborted" };
+        return;
       }
-      wake();
-    });
-    ws.on("error", (e) => {
-      queue.push({ type: "error", message: (e as Error).message });
-      closed = true;
-      wake();
-    });
-    signal?.addEventListener("abort", () => { try { ws.close(); } catch {} });
+      signal.addEventListener("abort", () => {
+        aborted = true;
+        conn.invoke("chat.abort", { sessionKey: sessionId }).catch(() => undefined);
+      }, { once: true });
+    }
+
+    // Fire chat.send concurrently — don't await; chat events drive completion.
+    conn.invoke("chat.send", {
+      sessionKey: sessionId,
+      message: text,
+      idempotencyKey: randomUUID(),
+    }).catch(() => undefined);
 
     try {
-      while (true) {
-        while (queue.length) {
-          const ev = queue.shift()!;
-          yield ev;
-          if (ev.type === "done" || ev.type === "error") return;
+      for await (const ev of sub.events) {
+        if (aborted) {
+          yield { type: "error", message: "aborted" };
+          return;
         }
-        if (closed) return;
-        await new Promise<void>((res) => { waiter = res; });
+        const te = parseTranscriptEvent(ev.event, ev.payload);
+        if (!te) continue;
+        const r = adaptTranscriptEvent(te, state);
+        state = r.next;
+        for (const out of r.out) {
+          yield out;
+          if (out.type === "done" || out.type === "error") return;
+        }
       }
     } finally {
-      try { ws.close(); } catch {}
+      await sub.unsubscribe();
     }
   }
 
