@@ -1,17 +1,19 @@
 import { loadConfig } from "./config";
 import { createClient, type Client } from "./client";
 
-let cached: Client | null | undefined;
+let cached: Client | null = null;
 
 export function getClient(): Client | null {
-  if (cached === undefined) {
-    const cfg = loadConfig();
-    cached = cfg ? createClient(cfg) : null;
+  if (cached) return cached;
+  const cfg = loadConfig();
+  if (cfg) {
+    cached = createClient(cfg);
+    return cached;
   }
-  return cached;
+  return null;
 }
 
-export function __resetClientForTests() { cached = undefined; }
+export function __resetClientForTests() { cached = null; }
 
 export type { SessionSummary, Message } from "./client";
 export type { StreamEvent } from "./events";
