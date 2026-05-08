@@ -9,19 +9,21 @@ export type GatewayConfig = {
 };
 
 export function loadConfig(): GatewayConfig | null {
+  // Env vars take precedence over file-based config.
+  const url = process.env.OPENCLAW_GATEWAY_URL;
+  const token = process.env.OPENCLAW_TOKEN;
+  if (url && token) return { url, token, source: "env" };
+
   try {
     const raw = readFileSync(join(homedir(), ".openclaw", "openclaw.json"), "utf8");
     const parsed = JSON.parse(raw);
     const port = parsed?.gateway?.port;
-    const token = parsed?.gateway?.auth?.token;
-    if (typeof port === "number" && typeof token === "string" && token.length > 0) {
-      return { url: `http://127.0.0.1:${port}`, token, source: "file" };
+    const fileToken = parsed?.gateway?.auth?.token;
+    if (typeof port === "number" && typeof fileToken === "string" && fileToken.length > 0) {
+      return { url: `http://127.0.0.1:${port}`, token: fileToken, source: "file" };
     }
   } catch {
-    // fall through to env
+    // no usable file config
   }
-  const url = process.env.OPENCLAW_GATEWAY_URL;
-  const token = process.env.OPENCLAW_TOKEN;
-  if (url && token) return { url, token, source: "env" };
   return null;
 }

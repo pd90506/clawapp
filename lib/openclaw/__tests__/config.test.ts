@@ -25,8 +25,7 @@ describe("loadConfig", () => {
     });
   });
 
-  it("falls back to env vars when file is unreadable", async () => {
-    readFileSyncMock.mockImplementation(() => { throw new Error("ENOENT"); });
+  it("reads gateway url and token from env vars (preferred over file)", async () => {
     vi.stubEnv("OPENCLAW_GATEWAY_URL", "http://127.0.0.1:9999");
     vi.stubEnv("OPENCLAW_TOKEN", "env-tok");
     const { loadConfig } = await import("../config");
@@ -35,6 +34,7 @@ describe("loadConfig", () => {
       token: "env-tok",
       source: "env",
     });
+    expect(readFileSyncMock).not.toHaveBeenCalled();
   });
 
   it("returns null when neither file nor env are usable", async () => {

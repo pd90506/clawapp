@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Use a separate dist directory when running e2e tests so the dev server
+  // doesn't conflict with an already-running `pnpm dev` instance.
+  ...(process.env.NEXT_E2E === "1" ? { distDir: ".next-e2e" } : {}),
 };
 
 export default nextConfig;
