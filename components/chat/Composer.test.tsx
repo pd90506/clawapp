@@ -11,11 +11,28 @@ describe("Composer", () => {
     await userEvent.click(screen.getByRole("button", { name: /send/i }));
     expect(onSend).toHaveBeenCalledWith("hello");
   });
-  it("submits on Cmd/Ctrl-Enter", async () => {
+  it("submits on Enter", async () => {
     const onSend = vi.fn();
     render(<Composer onSend={onSend} disabled={false} />);
     const ta = screen.getByRole("textbox");
     await userEvent.type(ta, "hi");
+    await userEvent.keyboard("{Enter}");
+    expect(onSend).toHaveBeenCalledWith("hi");
+  });
+  it("inserts a newline on Shift-Enter (does not submit)", async () => {
+    const onSend = vi.fn();
+    render(<Composer onSend={onSend} disabled={false} />);
+    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
+    await userEvent.type(ta, "line1");
+    await userEvent.keyboard("{Shift>}{Enter}{/Shift}");
+    await userEvent.type(ta, "line2");
+    expect(onSend).not.toHaveBeenCalled();
+    expect(ta.value).toBe("line1\nline2");
+  });
+  it("Cmd/Ctrl-Enter still submits (alias)", async () => {
+    const onSend = vi.fn();
+    render(<Composer onSend={onSend} disabled={false} />);
+    await userEvent.type(screen.getByRole("textbox"), "hi");
     await userEvent.keyboard("{Control>}{Enter}{/Control}");
     expect(onSend).toHaveBeenCalledWith("hi");
   });

@@ -12,7 +12,11 @@ export function Composer({ onSend, disabled, modelLabel }: Props) {
     setText("");
   };
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); submit(); }
+    if (e.key !== "Enter") return;
+    // Shift/Alt + Enter inserts a newline; Enter (and ⌘/Ctrl-Enter) sends.
+    if (e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    submit();
   };
   return (
     <div className="px-6 pb-6">
@@ -24,7 +28,7 @@ export function Composer({ onSend, disabled, modelLabel }: Props) {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           disabled={disabled}
-          placeholder={disabled ? "Gateway unavailable" : "Type a message… (⌘/Ctrl-Enter to send)"}
+          placeholder={disabled ? "Gateway unavailable" : "Type a message… (Enter to send · Shift-Enter for new line)"}
         />
         <div className="flex items-center justify-between pt-2">
           <span className="text-xs text-[var(--text-faint)]">{modelLabel ?? ""}</span>
