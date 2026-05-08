@@ -44,7 +44,7 @@ export function Message({ message }: { message: ChatMessage }) {
         <div className="msg-name">OpenClaw</div>
         {message.blocks.map((b, i) => {
           if (b.kind === "thinking") {
-            return <ThinkingPanel key={i} text={b.text} done={b.done} />;
+            return <ThinkingPanel key={i} text={b.text} done={b.done} detail={b.detail} />;
           }
           if (b.kind === "tool_call") {
             return (

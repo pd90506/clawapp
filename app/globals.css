@@ -539,6 +539,54 @@ input, textarea { font: inherit; color: inherit; }
 }
 @keyframes caret { 50% { opacity: 0; } }
 
+/* Expandable thought-process */
+.annot.thought {
+  display: block;
+  align-items: initial;
+  margin-bottom: 8px;
+}
+.annot.thought::before { content: ''; margin: 0; }
+.thought-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-3);
+  font-style: italic;
+  cursor: pointer;
+  letter-spacing: 0.005em;
+}
+.thought-toggle:hover { color: var(--ink-2); }
+.thought-toggle .caret {
+  font-style: normal;
+  color: var(--ink-4);
+  font-size: 14px;
+  line-height: 1;
+  width: 12px;
+  display: inline-flex;
+  justify-content: center;
+}
+.thought-detail {
+  list-style: none;
+  margin: 10px 0 6px 4px;
+  padding: 4px 0 4px 18px;
+  border-left: 2px solid var(--line-strong, var(--line));
+  font-size: 14px;
+  color: var(--ink-3);
+  font-style: italic;
+  letter-spacing: 0.005em;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: transparent;
+  border-radius: 0;
+}
+.thought-detail li { line-height: 1.7; }
+
 /* Message actions (copy, save, image) */
 .msg-actions {
   margin-top: 10px;
