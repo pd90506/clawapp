@@ -1127,8 +1127,15 @@ input, textarea { font: inherit; color: inherit; }
   margin: 0.5em 0;
   list-style-position: outside;
 }
-.md-content li { margin: 0.15em 0; }
-.md-content li > p { margin: 0; }
+.md-content li {
+  margin: 0.1em 0;
+  line-height: 1.55;
+}
+/* Suppress paragraph margins inside list items so loose lists from
+ * react-markdown render visually like tight lists. */
+.md-content li p { margin: 0; }
+.md-content li > *:first-child { margin-top: 0; }
+.md-content li > *:last-child { margin-bottom: 0; }
 .md-content li.task-list-item { list-style: none; margin-left: -1.2em; }
 .md-content li.task-list-item input[type="checkbox"] {
   margin-right: 0.4em;
