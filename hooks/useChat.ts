@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import { parseSseChunks } from "./sseParse";
 
 export type Block =
@@ -16,20 +16,48 @@ export type ChatMessage = {
 
 export type Status = "idle" | "streaming" | "error";
 
+type ChatState = { messages: ChatMessage[]; status: Status };
+type ChatAction =
+  | { type: "reset" }
+  | { type: "appendMessages"; userMsg: ChatMessage; asst: ChatMessage }
+  | { type: "updateLast"; fn: (m: ChatMessage) => ChatMessage }
+  | { type: "setStatus"; status: Status };
+
+function chatReducer(state: ChatState, action: ChatAction): ChatState {
+  switch (action.type) {
+    case "reset":
+      return { messages: [], status: "idle" };
+    case "appendMessages":
+      return { ...state, messages: [...state.messages, action.userMsg, action.asst] };
+    case "updateLast": {
+      const ms = state.messages;
+      if (!ms.length) return state;
+      const copy = ms.slice();
+      copy[copy.length - 1] = action.fn(copy[copy.length - 1]);
+      return { ...state, messages: copy };
+    }
+    case "setStatus":
+      return { ...state, status: action.status };
+  }
+}
+
 export function useChat(sessionId: string) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [status, setStatus] = useState<Status>("idle");
+  const [{ messages, status }, dispatch] = useReducer(chatReducer, { messages: [], status: "idle" });
   const abortRef = useRef<AbortController | null>(null);
   const idRef = useRef(0);
   const newId = () => `m-${++idRef.current}`;
 
+  // Abort in-flight stream on unmount
+  useEffect(() => () => { abortRef.current?.abort(); }, []);
+
+  // Abort and reset when sessionId changes
+  useEffect(() => {
+    abortRef.current?.abort();
+    dispatch({ type: "reset" });
+  }, [sessionId]);
+
   const updateLast = useCallback((fn: (m: ChatMessage) => ChatMessage) => {
-    setMessages((ms) => {
-      if (!ms.length) return ms;
-      const copy = ms.slice();
-      copy[copy.length - 1] = fn(copy[copy.length - 1]);
-      return copy;
-    });
+    dispatch({ type: "updateLast", fn });
   }, []);
 
   const handleEvent = useCallback((event: string, data: unknown) => {
@@ -71,18 +99,18 @@ export function useChat(sessionId: string) {
         ...m,
         blocks: m.blocks.map((b) => (b.kind === "thinking" ? { ...b, done: true } : b)),
       }));
-      setStatus("idle");
+      dispatch({ type: "setStatus", status: "idle" });
     } else if (event === "error") {
       updateLast((m) => ({ ...m, error: String(d.message ?? "stream error") }));
-      setStatus("error");
+      dispatch({ type: "setStatus", status: "error" });
     }
   }, [updateLast]);
 
   const send = useCallback(async (text: string) => {
     const userMsg: ChatMessage = { id: newId(), role: "user", blocks: [{ kind: "text", md: text }] };
     const asst: ChatMessage = { id: newId(), role: "assistant", blocks: [] };
-    setMessages((ms) => [...ms, userMsg, asst]);
-    setStatus("streaming");
+    dispatch({ type: "appendMessages", userMsg, asst });
+    dispatch({ type: "setStatus", status: "streaming" });
 
     const ac = new AbortController();
     abortRef.current = ac;

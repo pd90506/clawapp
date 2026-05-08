@@ -63,4 +63,33 @@ describe("useChat", () => {
       expect(result.current.status).toBe("error");
     });
   });
+
+  it("aborts in-flight request when unmounted", async () => {
+    let signal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((_url, init) => {
+      signal = init?.signal as AbortSignal;
+      // Return a Response with a stream that never closes
+      const body = new ReadableStream<Uint8Array>({ start() { /* never enqueue/close */ } });
+      return Promise.resolve(new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } }));
+    }));
+    const { result, unmount } = renderHook(() => useChat("s1"));
+    // start the send but DON'T await; we need to unmount mid-stream
+    act(() => { void result.current.send("hi"); });
+    // give the hook a tick to attach the signal
+    await new Promise((r) => setTimeout(r, 10));
+    unmount();
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it("resets messages and aborts on sessionId change", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(streamFromFrames([
+      { event: "token", data: { type: "token", text: "a" } },
+      { event: "done", data: { type: "done" } },
+    ])));
+    const { result, rerender } = renderHook(({ id }) => useChat(id), { initialProps: { id: "s1" } });
+    await act(async () => { await result.current.send("hi"); });
+    await waitFor(() => expect(result.current.messages.length).toBe(2));
+    rerender({ id: "s2" });
+    await waitFor(() => expect(result.current.messages).toEqual([]));
+  });
 });
