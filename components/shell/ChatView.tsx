@@ -21,12 +21,14 @@ export function ChatView({ sessionId, selectedAgent, onSelectAgent, modelLabel, 
 
 function ActiveChat({ sessionId, modelLabel, composerDisabled }: { sessionId: string; modelLabel?: string; composerDisabled: boolean }) {
   const { messages, status, send } = useChat(sessionId);
+  const isStreaming = status === "streaming";
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className="thread-wrap" style={{ display: "grid", gridTemplateRows: "1fr auto", minHeight: 0 }}>
       <MessageList messages={messages} status={status} />
       <Composer
         onSend={send}
-        disabled={composerDisabled || status === "streaming"}
+        disabled={composerDisabled || isStreaming}
+        streaming={isStreaming}
         modelLabel={modelLabel}
       />
     </div>
