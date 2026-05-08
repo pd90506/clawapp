@@ -24,6 +24,7 @@ export function useLayoutWidths() {
 
   // Hydrate from localStorage after mount to avoid SSR mismatch
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setWidths(readStorage());
   }, []);
 

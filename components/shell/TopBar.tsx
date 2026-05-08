@@ -11,7 +11,9 @@ type Props = {
   onToggleRight: () => void;
 };
 
-export function TopBar({ tab, onTabChange, leftOpen: _leftOpen, rightOpen: _rightOpen, onToggleLeft, onToggleRight }: Props) {
+// leftOpen/rightOpen not used in the visual — toggle buttons are present regardless.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function TopBar({ tab, onTabChange, leftOpen: _l, rightOpen: _r, onToggleLeft, onToggleRight }: Props) {
   return (
     <div className="titlebar">
       <div className="tb-left">
@@ -30,9 +32,10 @@ export function TopBar({ tab, onTabChange, leftOpen: _leftOpen, rightOpen: _righ
         </button>
       </div>
 
-      <div className="seg">
+      <div className="seg" role="tablist">
         <button
           type="button"
+          role="tab"
           aria-selected={tab === "chat"}
           className={tab === "chat" ? "on" : ""}
           onClick={() => onTabChange("chat")}
@@ -41,6 +44,7 @@ export function TopBar({ tab, onTabChange, leftOpen: _leftOpen, rightOpen: _righ
         </button>
         <button
           type="button"
+          role="tab"
           aria-selected={tab === "channels"}
           className={tab === "channels" ? "on" : ""}
           onClick={() => onTabChange("channels")}

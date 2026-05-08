@@ -1,19 +1,24 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { Inter, JetBrains_Mono } from "next/font/google";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter-loaded",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jbm-loaded",
+  display: "swap",
+});
 
 export const metadata: Metadata = { title: "clawapp", description: "openclaw chat" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body>
         {children}
       </body>

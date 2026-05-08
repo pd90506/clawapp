@@ -2,9 +2,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { SlashIcon, PlusIcon, BulbIcon, StopIcon } from "@/components/shell/Icons";
 
-type Props = { onSend: (text: string) => void; disabled: boolean; streaming?: boolean; onStop?: () => void; modelLabel?: string };
+type Props = { onSend: (text: string) => void; disabled: boolean; streaming?: boolean; onStop?: () => void };
 
-export function Composer({ onSend, disabled, streaming = false, onStop, modelLabel: _modelLabel }: Props) {
+export function Composer({ onSend, disabled, streaming = false, onStop }: Props) {
   const [text, setText] = useState("");
   const [model, setModel] = useState("claw-coder");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -41,6 +41,7 @@ export function Composer({ onSend, disabled, streaming = false, onStop, modelLab
         <textarea
           ref={textareaRef}
           rows={1}
+          aria-label="Message input"
           placeholder={disabled ? "Gateway unavailable" : "Message OpenClaw…  (Return to send, Shift+Return for newline)"}
           value={text}
           onChange={(e) => setText(e.target.value)}

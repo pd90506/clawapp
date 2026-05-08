@@ -69,6 +69,12 @@
   --accent-ink:   oklch(0.78 0.12 var(--accent-h));
 }
 
+/* Override font stacks with Next.js-loaded font variables when available */
+:root {
+  --font-ui: var(--font-inter-loaded, 'Inter'), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-jbm-loaded, 'JetBrains Mono'), ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
 * { box-sizing: border-box; }
 
 html, body {

@@ -52,13 +52,27 @@ export function AppShell() {
 
   // Drag resize
   const dragRef = useRef<{ which: "left" | "right"; startX: number; startLeft: number; startRight: number } | null>(null);
+  // Keep a stable ref to current widths so the event handler closure stays fresh
+  const widthsRef = useRef({ leftWidth, rightWidth });
+  useEffect(() => {
+    widthsRef.current = { leftWidth, rightWidth };
+  }, [leftWidth, rightWidth]);
 
-  const startDrag = (which: "left" | "right") => (e: React.MouseEvent) => {
+  const startDragLeft = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    dragRef.current = { which, startX: e.clientX, startLeft: leftWidth, startRight: rightWidth };
+    const { leftWidth: lw, rightWidth: rw } = widthsRef.current;
+    dragRef.current = { which: "left", startX: e.clientX, startLeft: lw, startRight: rw };
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
-  };
+  }, []);
+
+  const startDragRight = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const { leftWidth: lw, rightWidth: rw } = widthsRef.current;
+    dragRef.current = { which: "right", startX: e.clientX, startLeft: lw, startRight: rw };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -167,7 +181,7 @@ export function AppShell() {
           {/* Left divider */}
           <div
             className="divider"
-            onMouseDown={inlineLeft ? startDrag("left") : undefined}
+            onMouseDown={inlineLeft ? startDragLeft : undefined}
             style={{ pointerEvents: inlineLeft ? "auto" : "none", opacity: inlineLeft ? 1 : 0 }}
             title="Drag to resize"
           />
@@ -189,7 +203,7 @@ export function AppShell() {
           {/* Right divider */}
           <div
             className="divider"
-            onMouseDown={inlineRight ? startDrag("right") : undefined}
+            onMouseDown={inlineRight ? startDragRight : undefined}
             style={{ pointerEvents: inlineRight ? "auto" : "none", opacity: inlineRight ? 1 : 0 }}
             title="Drag to resize"
           />

@@ -18,13 +18,13 @@ type Props = {
   onDelete: (id: string) => void;
 };
 
-export function SessionCard({ session, active, pinned: _pinned, onSelect, onTogglePin: _onTogglePin, onDelete }: Props) {
+export function SessionCard({ session, active, pinned: _pinned, onSelect, onTogglePin, onDelete }: Props) {
   // Use first letter of agentId as avatar initial
   const initial = session.agentId?.[0]?.toUpperCase() ?? "M";
 
   return (
     <div
-      onContextMenu={(e) => { e.preventDefault(); _onTogglePin(session.id); }}
+      onContextMenu={(e) => { e.preventDefault(); onTogglePin(session.id); }}
       onClick={() => onSelect(session.id)}
       className={`convo${active ? " active" : ""}`}
     >
