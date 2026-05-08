@@ -18,6 +18,9 @@ export class GatewayConnection {
   private connectReqId: string | null = null;
   private pending = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
   private subs = new Map<string, { queues: Set<Queue>; refcount: number }>();
+  private backoffMs = 250;
+  private maxBackoffMs = 8000;
+  private closing = false;
 
   constructor(private cfg: GatewayConfig) {
     this.readyPromise = new Promise((resolve, reject) => {
@@ -121,17 +124,45 @@ export class GatewayConnection {
   }
 
   private connect() {
+    this.state = "connecting";
+    // Reset readyPromise on reconnect so callers can `await ready()` again if needed.
+    this.readyPromise = new Promise((resolve, reject) => {
+      this.readyResolve = resolve;
+      this.readyReject = reject;
+    });
     const wsUrl = this.cfg.url.replace(/^http/, "ws") + "/";
     this.ws = new WebSocket(wsUrl);
     this.ws.on("message", (raw) => this.onFrame(raw.toString()));
-    this.ws.on("close", () => {
-      if (this.state === "connecting") this.readyReject(new Error("closed before handshake"));
-      this.state = "closed";
-    });
-    this.ws.on("error", (e) => {
-      if (this.state === "connecting") this.readyReject(e);
-      this.state = "error";
-    });
+    this.ws.on("close", () => this.onClose());
+    this.ws.on("error", () => { /* close will follow */ });
+  }
+
+  private onClose() {
+    if (this.state === "connecting") {
+      this.readyReject(new Error("closed before handshake"));
+    }
+    this.state = "closed";
+    for (const [, w] of this.pending) w.reject(new Error("transport-reset"));
+    this.pending.clear();
+    if (this.closing) return;
+    setTimeout(() => this.reconnect(), this.backoffMs);
+    this.backoffMs = Math.min(this.backoffMs * 2, this.maxBackoffMs);
+  }
+
+  private async reconnect() {
+    if (this.closing) return;
+    this.connect();
+    try {
+      await this.readyPromise;
+      this.backoffMs = 250;
+      // Re-issue all active subscriptions (both subscribe families)
+      for (const sessionKey of this.subs.keys()) {
+        this.invoke("sessions.messages.subscribe", { key: sessionKey }).catch(() => undefined);
+        this.invoke("sessions.subscribe", { key: sessionKey }).catch(() => undefined);
+      }
+    } catch {
+      // onClose will reschedule
+    }
   }
 
   private onFrame(raw: string) {
@@ -189,6 +220,7 @@ export class GatewayConnection {
   }
 
   async close(): Promise<void> {
+    this.closing = true;
     for (const [, entry] of this.subs) for (const q of entry.queues) q.end();
     this.subs.clear();
     for (const [, w] of this.pending) w.reject(new Error("connection closed"));
