@@ -4,6 +4,8 @@ import { SlashIcon, PlusIcon, BulbIcon, StopIcon } from "@/components/shell/Icon
 
 type Effort = "low" | "medium" | "high" | "max";
 
+type ModelItem = { id: string; label: string; provider?: string; isDefault: boolean };
+
 type Props = { onSend: (text: string) => void; disabled: boolean; streaming?: boolean; onStop?: () => void };
 
 const SLASH_COMMANDS = [
@@ -26,12 +28,50 @@ const EFFORTS: { key: Effort; label: string; hint: string }[] = [
   { key: "max",    label: "Max",    hint: "Full depth" },
 ];
 
+const FALLBACK_MODELS: ModelItem[] = [
+  { id: "default", label: "Default", isDefault: true },
+];
+
+const LS_KEY = "clawapp.model";
+
+function loadStoredModel(): string | null {
+  try { return localStorage.getItem(LS_KEY); } catch { return null; }
+}
+function saveStoredModel(id: string) {
+  try { localStorage.setItem(LS_KEY, id); } catch { /* ignore */ }
+}
+
 export function Composer({ onSend, disabled, streaming = false, onStop }: Props) {
   const [text, setText] = useState("");
-  const [model, setModel] = useState("claw-coder");
   const [effort, setEffort] = useState<Effort>("medium");
-  const [openMenu, setOpenMenu] = useState<"slash" | "plus" | "effort" | null>(null);
+  const [openMenu, setOpenMenu] = useState<"slash" | "plus" | "effort" | "model" | null>(null);
+  const [models, setModels] = useState<ModelItem[]>([]);
+  const [model, setModelState] = useState<string>("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Fetch real models from openclaw on mount
+  useEffect(() => {
+    fetch("/api/models")
+      .then((r) => r.json())
+      .then((data: { models?: ModelItem[] }) => {
+        const list = data.models && data.models.length > 0 ? data.models : FALLBACK_MODELS;
+        setModels(list);
+        // Restore from localStorage or pick the default
+        const stored = loadStoredModel();
+        const match = stored ? list.find((m) => m.id === stored) : null;
+        const defaultItem = list.find((m) => m.isDefault) ?? list[0];
+        setModelState(match ? match.id : defaultItem.id);
+      })
+      .catch(() => {
+        setModels(FALLBACK_MODELS);
+        setModelState(FALLBACK_MODELS[0].id);
+      });
+  }, []);
+
+  const setModel = (id: string) => {
+    setModelState(id);
+    saveStoredModel(id);
+  };
 
   // Auto-resize textarea
   useEffect(() => {
@@ -74,6 +114,7 @@ export function Composer({ onSend, disabled, streaming = false, onStop }: Props)
   };
 
   const currentEffortLabel = EFFORTS.find((e) => e.key === effort)?.label ?? "Medium";
+  const currentModel = models.find((m) => m.id === model);
 
   return (
     <div className="composer">
@@ -182,16 +223,42 @@ export function Composer({ onSend, disabled, streaming = false, onStop }: Props)
             )}
           </div>
 
-          <select
-            className="cbtn"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            style={{ appearance: "none", paddingRight: 22 }}
-          >
-            <option value="claw-coder">Claw Coder</option>
-            <option value="claw-base">Claw Base</option>
-            <option value="claw-fast">Claw Fast</option>
-          </select>
+          {/* Model selector */}
+          <div className="menu-anchor">
+            <button
+              type="button"
+              className={`cbtn${openMenu === "model" ? " active" : ""}`}
+              aria-label="Model selector"
+              onClick={() => setOpenMenu(openMenu === "model" ? null : "model")}
+            >
+              <span className="model-label">
+                {currentModel && currentModel.isDefault
+                  ? <>Default <span className="model-name">({currentModel.label})</span></>
+                  : <>{currentModel?.label ?? "Model"}</>}
+              </span>
+              <span className="chev">˅</span>
+            </button>
+            {openMenu === "model" && (
+              <div className="popmenu align-right model-menu" role="menu">
+                <div className="popmenu-head">Model</div>
+                {models.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className={`popmenu-item${m.id === model ? " on" : ""}`}
+                    role="menuitem"
+                    onClick={() => { setModel(m.id); setOpenMenu(null); }}
+                  >
+                    <span className="cmd">
+                      {m.label}
+                      {m.isDefault && <span className="default-tag">Default</span>}
+                    </span>
+                    <span className="desc">{m.provider ?? ""}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {streaming ? (
             <button type="button" className="send-btn streaming" onClick={onStop} aria-label="Stop streaming">

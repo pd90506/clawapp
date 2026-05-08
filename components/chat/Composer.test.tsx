@@ -1,7 +1,21 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Composer } from "./Composer";
+
+const MOCK_MODELS = [
+  { id: "kimi/kimi-code", label: "Kimi", isDefault: true },
+  { id: "gpt-5.5", label: "GPT 5.5", isDefault: false },
+];
+
+function setupFetch(models = MOCK_MODELS) {
+  global.fetch = vi.fn().mockResolvedValue({
+    json: async () => ({ models }),
+  } as Response);
+}
+
+beforeEach(() => setupFetch());
+afterEach(() => vi.restoreAllMocks());
 
 describe("Composer", () => {
   it("submits on click", async () => {
@@ -66,5 +80,57 @@ describe("Composer", () => {
     // Click outside (on the body)
     await userEvent.click(document.body);
     expect(screen.queryByText("/plan")).not.toBeInTheDocument();
+  });
+});
+
+describe("Composer — model selector", () => {
+  it("renders model menu button after /api/models fetch resolves", async () => {
+    render(<Composer onSend={() => {}} disabled={false} />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /model selector/i })).toBeInTheDocument()
+    );
+  });
+
+  it("shows 'Default (Kimi)' when the current model is the default", async () => {
+    render(<Composer onSend={() => {}} disabled={false} />);
+    await waitFor(() => expect(screen.getByText("Default")).toBeInTheDocument());
+    expect(screen.getByText("(Kimi)")).toBeInTheDocument();
+  });
+
+  it("shows plain label when current model is not the default", async () => {
+    // Pre-seed localStorage so GPT 5.5 (non-default) is selected
+    localStorage.setItem("clawapp.model", "gpt-5.5");
+    render(<Composer onSend={() => {}} disabled={false} />);
+    await waitFor(() => {
+      const btn = screen.getByRole("button", { name: /model selector/i });
+      expect(btn.textContent).toContain("GPT 5.5");
+      expect(btn.textContent).not.toContain("Default");
+    });
+    localStorage.removeItem("clawapp.model");
+  });
+
+  it("clicking a model item updates the displayed label", async () => {
+    render(<Composer onSend={() => {}} disabled={false} />);
+    // Wait for models to load
+    await waitFor(() => screen.getByRole("button", { name: /model selector/i }));
+    // Open the model menu
+    await userEvent.click(screen.getByRole("button", { name: /model selector/i }));
+    // Click on GPT 5.5
+    await userEvent.click(screen.getByRole("menuitem", { name: /GPT 5.5/i }));
+    // Menu should close and button should now show plain label
+    await waitFor(() => {
+      const btn = screen.getByRole("button", { name: /model selector/i });
+      expect(btn.textContent).toContain("GPT 5.5");
+      expect(btn.textContent).not.toContain("Default");
+    });
+    localStorage.removeItem("clawapp.model");
+  });
+
+  it("falls back to Default model when fetch fails", async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error("network error"));
+    render(<Composer onSend={() => {}} disabled={false} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /model selector/i })).toBeInTheDocument());
+    const btn = screen.getByRole("button", { name: /model selector/i });
+    expect(btn.textContent).toContain("Default");
   });
 });
