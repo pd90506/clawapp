@@ -117,3 +117,69 @@ describe("createClient", () => {
     await conn.close();
   });
 });
+
+describe("createClient — listAgents and createSession", () => {
+  it("listAgents returns an array mapped to id/label", async () => {
+    gw.onClient((c) => {
+      c.onRequest(async (method) => {
+        if (method === "agents.list") return { ok: true, payload: { agents: [
+          { id: "main", displayName: "Main", model: "kimi/kimi-code" },
+          { id: "test", label: "Test agent" },
+        ]}};
+        return { ok: false, error: { message: "no" } };
+      });
+    });
+    const conn = GatewayConnection.fromConfig({ url: gw.httpUrl, token: "t", source: "file" });
+    await conn.ready();
+    const c = createClient(conn);
+    const out = await c.listAgents();
+    expect(out).toEqual([
+      { id: "main", label: "Main", model: "kimi/kimi-code" },
+      { id: "test", label: "Test agent" },
+    ]);
+    await conn.close();
+  });
+
+  it("createSession invokes sessions.create with namespaced key and returns SessionSummary", async () => {
+    let createCallParams: unknown = null;
+    gw.onClient((c) => {
+      c.onRequest(async (method, params) => {
+        if (method === "sessions.create") {
+          createCallParams = params;
+          const key = (params as { key: string }).key;
+          return { ok: true, payload: { key, displayName: "New chat", hasActiveRun: false } };
+        }
+        return { ok: false, error: { message: "no" } };
+      });
+    });
+    const conn = GatewayConnection.fromConfig({ url: gw.httpUrl, token: "t", source: "file" });
+    await conn.ready();
+    const c = createClient(conn);
+    const r = await c.createSession({ label: "New chat" });
+    expect(r.id).toMatch(/^web:/);
+    expect(r.title).toBe("New chat");
+    expect((createCallParams as { agentId: string; label: string }).agentId).toBe("main");
+    expect((createCallParams as { label: string }).label).toBe("New chat");
+    await conn.close();
+  });
+
+  it("patchSessionLabel invokes sessions.patch", async () => {
+    let patchParams: unknown = null;
+    gw.onClient((c) => {
+      c.onRequest(async (method, params) => {
+        if (method === "sessions.patch") {
+          patchParams = params;
+          return { ok: true, payload: { ok: true } };
+        }
+        return { ok: false, error: { message: "no" } };
+      });
+    });
+    const conn = GatewayConnection.fromConfig({ url: gw.httpUrl, token: "t", source: "file" });
+    await conn.ready();
+    const c = createClient(conn);
+    await c.patchSessionLabel("web:abc", "Renamed");
+    expect((patchParams as { key: string; label: string }).key).toBe("web:abc");
+    expect((patchParams as { label: string }).label).toBe("Renamed");
+    await conn.close();
+  });
+});
