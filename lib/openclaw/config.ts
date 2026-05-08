@@ -27,3 +27,18 @@ export function loadConfig(): GatewayConfig | null {
   }
   return null;
 }
+
+/**
+ * Reads `agents.defaults.model.primary` from the local openclaw config.
+ * Returns the qualified id (e.g. "kimi/kimi-code") or null when absent.
+ */
+export function loadDefaultModelId(): string | null {
+  try {
+    const raw = readFileSync(join(homedir(), ".openclaw", "openclaw.json"), "utf8");
+    const parsed = JSON.parse(raw);
+    const primary = parsed?.agents?.defaults?.model?.primary;
+    return typeof primary === "string" && primary.length > 0 ? primary : null;
+  } catch {
+    return null;
+  }
+}

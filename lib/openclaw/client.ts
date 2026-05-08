@@ -9,6 +9,13 @@ export type Message = { role: "user" | "assistant" | "system"; text: string; at:
 
 export type AgentSummary = { id: string; label: string; model?: string };
 
+export type ModelSummary = {
+  id: string;       // canonical id, e.g. "kimi/kimi-code"
+  label: string;    // human-friendly name (alias if available, else id)
+  provider?: string;
+  isDefault: boolean;
+};
+
 export type Client = {
   listSessions(): Promise<SessionSummary[]>;
   getHistory(sessionId: string): Promise<Message[]>;
@@ -18,6 +25,7 @@ export type Client = {
   createSession(opts?: { label?: string; agentId?: string }): Promise<SessionSummary>;
   patchSessionLabel(sessionId: string, label: string): Promise<void>;
   deleteSession(sessionId: string): Promise<void>;
+  listModels(): Promise<ModelSummary[]>;
 };
 
 type RawSessionRow = {
@@ -150,5 +158,23 @@ export function createClient(conn: GatewayConnection): Client {
     await conn.invoke("sessions.delete", { key: sessionId, deleteTranscript: true });
   }
 
-  return { listSessions, getHistory, health, sendMessage, listAgents, createSession, patchSessionLabel, deleteSession };
+  async function listModels(): Promise<ModelSummary[]> {
+    const p = await conn.invoke("models.list", { view: "configured" }) as {
+      models?: { id?: string; alias?: string; label?: string; displayName?: string; provider?: string; default?: boolean; isDefault?: boolean }[];
+      defaultModel?: string;
+      primary?: string;
+    };
+    const rows = p?.models ?? [];
+    const defaultId = p?.defaultModel ?? p?.primary ?? rows.find((m) => m.default || m.isDefault)?.id;
+    return rows
+      .filter((m) => m.id)
+      .map((m) => ({
+        id: m.id!,
+        label: m.alias ?? m.label ?? m.displayName ?? m.id!,
+        provider: m.provider,
+        isDefault: m.id === defaultId,
+      }));
+  }
+
+  return { listSessions, getHistory, health, sendMessage, listAgents, createSession, patchSessionLabel, deleteSession, listModels };
 }

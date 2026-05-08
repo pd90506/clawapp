@@ -5,7 +5,7 @@ import { parseSseChunks } from "./sseParse";
 export type Block =
   | { kind: "text"; md: string }
   | { kind: "tool_call"; id: string; name: string; args: unknown; result?: unknown; error?: string; done: boolean }
-  | { kind: "thinking"; text: string; done: boolean };
+  | { kind: "thinking"; text: string; done: boolean; detail?: string[] };
 
 export type ChatMessage = {
   id: string;

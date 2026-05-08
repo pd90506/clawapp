@@ -6,13 +6,13 @@ import { TopBar } from "./TopBar";
 describe("TopBar", () => {
   it("renders Chat and Channels tabs and highlights active", () => {
     render(<TopBar tab="chat" onTabChange={() => {}} leftOpen={true} rightOpen={true} onToggleLeft={() => {}} onToggleRight={() => {}} />);
-    expect(screen.getByRole("button", { name: /^chat$/i })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("button", { name: /^channels$/i })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tab", { name: /^chat$/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /^channels$/i })).toHaveAttribute("aria-selected", "false");
   });
   it("calls onTabChange when a tab is clicked", async () => {
     const onTabChange = vi.fn();
     render(<TopBar tab="chat" onTabChange={onTabChange} leftOpen={true} rightOpen={true} onToggleLeft={() => {}} onToggleRight={() => {}} />);
-    await userEvent.click(screen.getByRole("button", { name: /channels/i }));
+    await userEvent.click(screen.getByRole("tab", { name: /channels/i }));
     expect(onTabChange).toHaveBeenCalledWith("channels");
   });
   it("calls onToggleLeft when left toggle clicked", async () => {

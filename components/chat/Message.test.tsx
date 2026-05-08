@@ -14,7 +14,7 @@ describe("Message", () => {
       id: "m1", role: "assistant",
       blocks: [{ kind: "tool_call", id: "t", name: "search", args: {}, done: true, result: "ok" }],
     }} />);
-    expect(screen.getByText("search")).toBeInTheDocument();
+    expect(screen.getByText("search", { exact: false })).toBeInTheDocument();
   });
   it("renders thinking block via ThinkingPanel", () => {
     render(<Message message={{
@@ -27,5 +27,17 @@ describe("Message", () => {
       id: "m1", role: "assistant", blocks: [], error: "boom",
     }} />);
     expect(screen.getByText(/boom/)).toBeInTheDocument();
+  });
+  it("assistant message renders a Copy-message button", () => {
+    render(<Message message={{
+      id: "m1", role: "assistant", blocks: [{ kind: "text", md: "hello" }],
+    }} />);
+    expect(screen.getByRole("button", { name: /copy message/i })).toBeInTheDocument();
+  });
+  it("user message does NOT render a copy-message button", () => {
+    render(<Message message={{
+      id: "m2", role: "user", blocks: [{ kind: "text", md: "hi" }],
+    }} />);
+    expect(screen.queryByRole("button", { name: /copy message/i })).toBeNull();
   });
 });

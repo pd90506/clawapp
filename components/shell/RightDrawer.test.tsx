@@ -4,10 +4,17 @@ import userEvent from "@testing-library/user-event";
 import { RightDrawer } from "./RightDrawer";
 
 describe("RightDrawer", () => {
-  it("renders Desk and Note section headers", () => {
+  it("renders search input", () => {
     render(<RightDrawer onCollapse={() => {}} />);
-    expect(screen.getByText("Desk")).toBeInTheDocument();
-    expect(screen.getByText("Note")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/search workspace/i)).toBeInTheDocument();
+  });
+  it("renders filter chips", () => {
+    render(<RightDrawer onCollapse={() => {}} />);
+    expect(screen.getByText(/filter/i)).toBeInTheDocument();
+  });
+  it("renders empty state message", () => {
+    render(<RightDrawer onCollapse={() => {}} />);
+    expect(screen.getByText(/no files yet/i)).toBeInTheDocument();
   });
   it("calls onCollapse when collapse button clicked", async () => {
     const onCollapse = vi.fn();

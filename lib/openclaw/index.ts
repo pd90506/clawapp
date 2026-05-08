@@ -17,5 +17,5 @@ export function getClient(): Client | null {
 
 export function __resetClientForTests() { cached = null; }
 
-export type { SessionSummary, Message } from "./client";
+export type { SessionSummary, Message, ModelSummary } from "./client";
 export type { StreamEvent } from "./events";

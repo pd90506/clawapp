@@ -8,26 +8,26 @@ type Props = {
   sessionId: string | null;
   selectedAgent: string;
   onSelectAgent: (id: string) => void;
-  modelLabel?: string;
   composerDisabled: boolean;
 };
 
-export function ChatView({ sessionId, selectedAgent, onSelectAgent, modelLabel, composerDisabled }: Props) {
+export function ChatView({ sessionId, selectedAgent, onSelectAgent, composerDisabled }: Props) {
   if (!sessionId) {
     return <EmptyHero selectedAgent={selectedAgent} onSelectAgent={onSelectAgent} />;
   }
-  return <ActiveChat sessionId={sessionId} modelLabel={modelLabel} composerDisabled={composerDisabled} />;
+  return <ActiveChat sessionId={sessionId} composerDisabled={composerDisabled} />;
 }
 
-function ActiveChat({ sessionId, modelLabel, composerDisabled }: { sessionId: string; modelLabel?: string; composerDisabled: boolean }) {
+function ActiveChat({ sessionId, composerDisabled }: { sessionId: string; composerDisabled: boolean }) {
   const { messages, status, send } = useChat(sessionId);
+  const isStreaming = status === "streaming";
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className="thread-wrap" style={{ display: "grid", gridTemplateRows: "1fr auto", minHeight: 0 }}>
       <MessageList messages={messages} status={status} />
       <Composer
         onSend={send}
-        disabled={composerDisabled || status === "streaming"}
-        modelLabel={modelLabel}
+        disabled={composerDisabled || isStreaming}
+        streaming={isStreaming}
       />
     </div>
   );
