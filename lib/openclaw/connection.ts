@@ -193,7 +193,7 @@ export class GatewayConnection {
     if (f.type === "event" && f.event === "connect.challenge") {
       const req = makeRequest("connect", {
         minProtocol: 3,
-        maxProtocol: 3,
+        maxProtocol: 4,
         client: { id: "gateway-client", version: "0.1.0", platform: "node", mode: "backend" },
         role: "operator",
         scopes: ["operator.read", "operator.write", "operator.admin", "operator.approvals", "operator.pairing", "operator.talk.secrets"],

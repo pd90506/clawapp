@@ -31,7 +31,7 @@ exported from the same bundle (e.g. `ErrorCodes.INVALID_REQUEST`, `ErrorCodes.UN
   "method": "connect",
   "params": {
     "minProtocol": 3,
-    "maxProtocol": 3,
+    "maxProtocol": 4,
     "client": {
       "id": "gateway-client",
       "version": "...",
@@ -59,7 +59,7 @@ exported from the same bundle (e.g. `ErrorCodes.INVALID_REQUEST`, `ErrorCodes.UN
   "ok": true,
   "payload": {
     "type": "hello-ok",
-    "protocol": 3,
+    "protocol": 4,
     "server": { "version": "...", "connId": "..." },
     "features": { "methods": ["..."], "events": ["..."] },
     "snapshot": {},
@@ -79,6 +79,20 @@ exported from the same bundle (e.g. `ErrorCodes.INVALID_REQUEST`, `ErrorCodes.UN
 Cross-reference: `docs/gateway/protocol.md:27-98`. `HelloOkSchema` in
 `dist/protocol-MvVoNN0Z.js`. All of `server`, `features`, `snapshot`, `auth`,
 `policy` are required by the schema.
+
+**Protocol version negotiation (verified against openclaw 2026.6.6, 2026-06-16).**
+The gateway now requires protocol **4** (`PROTOCOL_VERSION = 4`,
+`MIN_CLIENT_PROTOCOL_VERSION = 4` in `dist/version-51ymduTn.js`). The handshake
+handler accepts a connect iff `maxProtocol >= 4 && minProtocol <= 4`
+(`dist/message-handler-Cu13uhfp.js:898`); otherwise it replies
+`res ok:false {code:"INVALID_REQUEST", message:"protocol mismatch",
+details:{code:"PROTOCOL_MISMATCH", clientMinProtocol, clientMaxProtocol,
+expectedProtocol:4, minimumProbeProtocol:4}}` and closes the socket with WS code
+`1002`. Our client therefore sends `minProtocol: 3, maxProtocol: 4`
+(`lib/openclaw/connection.ts:196`) — `max>=4` satisfies the requirement while
+`min:3` stays backward-compatible with a hypothetical protocol-3 server. The
+server then returns `protocol: 4` in `hello-ok`. (Empirically: `min=3,max=3` is
+rejected with the error above; `min=3,max=4` negotiates `protocol=4`.)
 
 **Retryable startup race:** if sidecars aren't ready, `connect` can return
 `ok: false` with `error.details.reason = "startup-sidecars"` and
