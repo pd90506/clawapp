@@ -6,6 +6,17 @@ type Effort = "low" | "medium" | "high" | "max";
 
 type ModelItem = { id: string; label: string; provider?: string; isDefault: boolean };
 
+// The display name for a model row. A label that's just the provider/brand
+// (e.g. the config alias "DeepSeek" on a `deepseek` model) isn't a model name —
+// fall back to the concrete model id so the picker reads "deepseek-v4-flash",
+// not "DeepSeek". Genuine aliases like "opus" (provider "anthropic") are kept.
+export function modelDisplayName(m: { id: string; label?: string; provider?: string }): string {
+  const label = m.label?.trim();
+  if (!label) return m.id;
+  if (m.provider && label.toLowerCase() === m.provider.trim().toLowerCase()) return m.id;
+  return label;
+}
+
 type Props = { onSend: (text: string) => void; disabled: boolean; streaming?: boolean; onStop?: () => void };
 
 const SLASH_COMMANDS = [
@@ -80,6 +91,20 @@ export function Composer({ onSend, disabled, streaming = false, onStop }: Props)
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
   }, [text]);
+
+  // Reveal the scrollbar only while actively scrolling, then fade it back out.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const onScroll = () => {
+      el.classList.add("scrolling");
+      clearTimeout(timer);
+      timer = setTimeout(() => el.classList.remove("scrolling"), 700);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => { el.removeEventListener("scroll", onScroll); clearTimeout(timer); };
+  }, []);
 
   // Click-outside to close popmenus
   useEffect(() => {
@@ -233,8 +258,8 @@ export function Composer({ onSend, disabled, streaming = false, onStop }: Props)
             >
               <span className="model-label">
                 {currentModel && currentModel.isDefault
-                  ? <>Default <span className="model-name">({currentModel.label})</span></>
-                  : <>{currentModel?.label ?? "Model"}</>}
+                  ? <>Default <span className="model-name">({modelDisplayName(currentModel)})</span></>
+                  : <>{currentModel ? modelDisplayName(currentModel) : "Model"}</>}
               </span>
               <span className="chev">˅</span>
             </button>
@@ -250,7 +275,7 @@ export function Composer({ onSend, disabled, streaming = false, onStop }: Props)
                     onClick={() => { setModel(m.id); setOpenMenu(null); }}
                   >
                     <span className="cmd">
-                      {m.label}
+                      {modelDisplayName(m)}
                       {m.isDefault && <span className="default-tag">Default</span>}
                     </span>
                     <span className="desc">{m.provider ?? ""}</span>

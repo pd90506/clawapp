@@ -6,6 +6,10 @@ describe("parseStreamEvent", () => {
     const e = parseStreamEvent({ type: "token", text: "hi" });
     expect(e).toEqual({ type: "token", text: "hi" });
   });
+  it("parses replace event", () => {
+    const e = parseStreamEvent({ type: "replace", text: "hello" });
+    expect(e).toEqual({ type: "replace", text: "hello" });
+  });
   it("parses tool_call event", () => {
     const e = parseStreamEvent({ type: "tool_call", id: "t1", name: "search", args: { q: "x" } });
     expect(e?.type).toBe("tool_call");
@@ -91,6 +95,22 @@ describe("parseTranscriptEvent", () => {
     expect(e?.kind).toBe("chat");
     if (e?.kind === "chat") {
       expect(e.data.state).toBe("delta");
+    }
+  });
+
+  it("parses protocol v4 chat deltaText and replace fields", () => {
+    const e = parseTranscriptEvent("chat", {
+      runId: "r1",
+      sessionKey: "s1",
+      seq: 1,
+      state: "delta",
+      deltaText: "corrected answer",
+      replace: true,
+    });
+    expect(e?.kind).toBe("chat");
+    if (e?.kind === "chat") {
+      expect(e.data.deltaText).toBe("corrected answer");
+      expect(e.data.replace).toBe(true);
     }
   });
 

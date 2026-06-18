@@ -60,7 +60,7 @@ function rowsToMessages(rows: HistoryRow[]): ChatMessage[] {
   return out;
 }
 
-export function useChat(sessionId: string) {
+export function useChat(sessionId: string, onTurnComplete?: () => void) {
   const [{ messages, status }, dispatch] = useReducer(chatReducer, { messages: [], status: "idle" });
   const abortRef = useRef<AbortController | null>(null);
   const idRef = useRef(0);
@@ -101,6 +101,13 @@ export function useChat(sessionId: string) {
         else blocks.push({ kind: "text", md: text });
         return { ...m, blocks };
       });
+    } else if (event === "replace") {
+      const text = String(d.text ?? "");
+      updateLast((m) => {
+        const blocks: Block[] = m.blocks.filter((b) => b.kind !== "text");
+        if (text.length > 0) blocks.push({ kind: "text", md: text });
+        return { ...m, blocks };
+      });
     } else if (event === "thinking") {
       const text = String(d.text ?? "");
       updateLast((m) => {
@@ -130,11 +137,12 @@ export function useChat(sessionId: string) {
         blocks: m.blocks.map((b) => (b.kind === "thinking" ? { ...b, done: true } : b)),
       }));
       dispatch({ type: "setStatus", status: "idle" });
+      onTurnComplete?.();
     } else if (event === "error") {
       updateLast((m) => ({ ...m, error: String(d.message ?? "stream error") }));
       dispatch({ type: "setStatus", status: "error" });
     }
-  }, [updateLast]);
+  }, [updateLast, onTurnComplete]);
 
   const send = useCallback(async (text: string) => {
     const userMsg: ChatMessage = { id: newId(), role: "user", blocks: [{ kind: "text", md: text }] };

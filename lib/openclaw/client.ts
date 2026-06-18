@@ -4,8 +4,31 @@ import { parseTranscriptEvent, extractMessageText } from "./events";
 import { adaptTranscriptEvent, initialAdapterState } from "./adapter";
 import type { GatewayConnection } from "./connection";
 
-export type SessionSummary = { id: string; title: string };
+export type SessionSummary = { id: string; title: string; updatedAt?: number };
 export type Message = { role: "user" | "assistant" | "system"; text: string; at: number };
+
+/**
+ * Stable per-agent session key for app-owned chats. Mirrors how the gateway keys
+ * Telegram sessions (`agent:<name>:telegram:…`): the `app:` prefix marks a chat as
+ * owned by THIS desktop app so it never shares a transcript with another surface.
+ * Sharing one transcript across surfaces thrashes the prompt cache — each surface
+ * injects its own channel context near the front of the prompt, so alternating
+ * between them invalidates the cached prefix every turn. One key per surface keeps
+ * each transcript's warm prefix intact.
+ */
+export const APP_SESSION_PREFIX = "app:";
+export function appSessionKey(agentId: string): string {
+  return `${APP_SESSION_PREFIX}${agentId}`;
+}
+
+// The gateway namespaces a created session key under its agent, turning the
+// requested `app:<agent>` into `agent:<agent>:app:<agent>`. Match BOTH forms so
+// find-or-create reuses the session whether or not the backend namespaced it
+// (the real gateway does; some fakes don't).
+export function isAppSessionFor(sessionKey: string, agentId: string): boolean {
+  const raw = appSessionKey(agentId);
+  return sessionKey === raw || sessionKey === `agent:${agentId}:${raw}`;
+}
 
 export type AgentSummary = { id: string; label: string; model?: string };
 
@@ -23,6 +46,7 @@ export type Client = {
   sendMessage(sessionId: string, text: string, signal?: AbortSignal): AsyncIterable<StreamEvent>;
   listAgents(): Promise<AgentSummary[]>;
   createSession(opts?: { label?: string; agentId?: string }): Promise<SessionSummary>;
+  resolveAgentSession(agentId: string): Promise<SessionSummary>;
   patchSessionLabel(sessionId: string, label: string): Promise<void>;
   deleteSession(sessionId: string): Promise<void>;
   listModels(): Promise<ModelSummary[]>;
@@ -33,6 +57,7 @@ type RawSessionRow = {
   displayName?: string;
   derivedTitle?: string;
   label?: string;
+  updatedAt?: number;
 };
 
 type RawMessage = {
@@ -55,6 +80,7 @@ export function createClient(conn: GatewayConnection): Client {
     return (p?.sessions ?? []).map((s) => ({
       id: s.key,
       title: s.displayName ?? s.derivedTitle ?? s.label ?? s.key,
+      updatedAt: s.updatedAt,
     }));
   }
 
@@ -150,6 +176,25 @@ export function createClient(conn: GatewayConnection): Client {
     };
   }
 
+  // Find-or-create the agent's single app-owned session. Reusing the existing
+  // `app:<agent>` session keeps its transcript (and warm prompt-cache prefix)
+  // across opens; it also guarantees the app never targets another surface's
+  // session (e.g. Telegram), which is what corrupts caching.
+  async function resolveAgentSession(agentId: string): Promise<SessionSummary> {
+    const key = appSessionKey(agentId);
+    const existing = (await listSessions()).find((s) => isAppSessionFor(s.id, agentId));
+    if (existing) return existing;
+    const p = await conn.invoke("sessions.create", {
+      key,
+      agentId,
+      label: agentId,
+    }) as { key?: string; displayName?: string; derivedTitle?: string; label?: string };
+    return {
+      id: p.key ?? key,
+      title: p.displayName ?? p.derivedTitle ?? p.label ?? agentId,
+    };
+  }
+
   async function patchSessionLabel(sessionId: string, label: string): Promise<void> {
     await conn.invoke("sessions.patch", { key: sessionId, label });
   }
@@ -176,5 +221,5 @@ export function createClient(conn: GatewayConnection): Client {
       }));
   }
 
-  return { listSessions, getHistory, health, sendMessage, listAgents, createSession, patchSessionLabel, deleteSession, listModels };
+  return { listSessions, getHistory, health, sendMessage, listAgents, createSession, resolveAgentSession, patchSessionLabel, deleteSession, listModels };
 }

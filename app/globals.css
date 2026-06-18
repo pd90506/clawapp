@@ -126,6 +126,17 @@ input, textarea { font: inherit; color: inherit; }
 .tb-left, .tb-right { display: flex; align-items: center; gap: 10px; }
 .tb-right { justify-self: end; }
 
+/* Electron (frameless macOS) window chrome: the OS draws traffic lights over the
+   top-left of the webview. Make the title bar a drag region (so the window can be
+   moved) while keeping its controls clickable, and reserve space on the left so
+   the toggle button doesn't sit under the traffic lights. Scoped to the desktop
+   build via the `electron`/`mac` root classes — no effect in the browser. */
+.electron .titlebar { -webkit-app-region: drag; }
+.electron .titlebar button,
+.electron .titlebar .seg,
+.electron .titlebar .icon-btn { -webkit-app-region: no-drag; }
+.electron.mac .tb-left { padding-left: 72px; }
+
 .traffic { display: flex; gap: 8px; align-items: center; }
 .traffic .dot {
   width: 12px; height: 12px; border-radius: 50%;
@@ -348,6 +359,12 @@ input, textarea { font: inherit; color: inherit; }
   font-size: 13px;
   color: #fff;
   font-weight: 600;
+  overflow: hidden;
+}
+.convo .av img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .convo-title {
   font-size: 13.5px;
@@ -361,9 +378,24 @@ input, textarea { font: inherit; color: inherit; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-.convo-delete {
+.convo-title-edit {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--paper-sunk);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin: -2px 0;
+  width: 100%;
+  min-width: 0;
+  outline: none;
+}
+
+/* Hover kebab (⋮) → row options menu */
+.convo-kebab {
   position: absolute;
-  right: 8px;
+  right: 6px;
   top: 50%;
   transform: translateY(-50%);
   width: 22px; height: 22px;
@@ -371,12 +403,42 @@ input, textarea { font: inherit; color: inherit; }
   display: grid; place-items: center;
   color: var(--ink-3);
   font-size: 16px;
+  line-height: 1;
   opacity: 0;
   transition: opacity .12s, background .12s, color .12s;
   background: transparent;
 }
-.convo:hover .convo-delete { opacity: 1; }
-.convo-delete:hover { background: var(--paper-sunk); color: var(--ink); }
+.convo:hover .convo-kebab { opacity: 1; }
+.convo-kebab:hover { background: var(--paper); color: var(--ink); }
+
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.convo-menu {
+  position: absolute;
+  right: 6px;
+  top: calc(50% + 14px);
+  z-index: 50;
+  min-width: 120px;
+  padding: 4px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+}
+.convo-menu-item {
+  text-align: left;
+  font-size: 13px;
+  color: var(--ink);
+  padding: 6px 8px;
+  border-radius: 5px;
+  background: transparent;
+}
+.convo-menu-item:hover { background: var(--paper-sunk); }
 
 .rail-empty {
   padding: 30px 24px;
@@ -450,6 +512,11 @@ input, textarea { font: inherit; color: inherit; }
 }
 .msg-av.user {
   background: linear-gradient(135deg, #f4d2b3 0%, #d99770 100%);
+}
+.msg-av img {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .msg-body { min-width: 0; }
@@ -666,8 +733,17 @@ input, textarea { font: inherit; color: inherit; }
   max-height: 200px;
   padding: 4px 0;
   font-family: inherit;
+  /* Grow with content (JS caps height at max-height), then scroll. The scrollbar
+     thumb stays invisible until the user actually scrolls — see `.scrolling`. */
+  overflow-y: auto;
 }
 .composer textarea::placeholder { color: var(--ink-4); }
+.composer textarea::-webkit-scrollbar { width: 8px; }
+.composer textarea::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+}
+.composer textarea.scrolling::-webkit-scrollbar-thumb { background: var(--ink-5); }
 
 .composer-bar {
   display: flex; align-items: center; gap: 6px;

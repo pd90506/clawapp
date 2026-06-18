@@ -71,6 +71,39 @@ describe("useChat", () => {
     });
   });
 
+  it("replaces the current assistant text block on replace events", async () => {
+    vi.stubGlobal("fetch", routedFetch({ chatFrames: [
+      { event: "token", data: { type: "token", text: "helo" } },
+      { event: "replace", data: { type: "replace", text: "hello" } },
+      { event: "done", data: { type: "done" } },
+    ]}));
+    const { result } = renderHook(() => useChat("s1"));
+    await act(async () => { await result.current.send("hi"); });
+    await waitFor(() => {
+      const last = result.current.messages.at(-1)!;
+      expect(last.blocks).toEqual([{ kind: "text", md: "hello" }]);
+      expect(result.current.status).toBe("idle");
+    });
+  });
+
+  it("replace events remove stale text across tool-split assistant blocks", async () => {
+    vi.stubGlobal("fetch", routedFetch({ chatFrames: [
+      { event: "token", data: { type: "token", text: "prefix " } },
+      { event: "tool_call", data: { type: "tool_call", id: "t1", name: "search", args: {} } },
+      { event: "token", data: { type: "token", text: "helo" } },
+      { event: "replace", data: { type: "replace", text: "hello" } },
+      { event: "done", data: { type: "done" } },
+    ]}));
+    const { result } = renderHook(() => useChat("s1"));
+    await act(async () => { await result.current.send("hi"); });
+    await waitFor(() => {
+      const last = result.current.messages.at(-1)!;
+      expect(last.blocks.filter((b) => b.kind === "text")).toEqual([{ kind: "text", md: "hello" }]);
+      expect(last.blocks.some((b) => b.kind === "tool_call")).toBe(true);
+      expect(result.current.status).toBe("idle");
+    });
+  });
+
   it("marks message errored on error event", async () => {
     vi.stubGlobal("fetch", routedFetch({ chatFrames: [
       { event: "error", data: { type: "error", message: "boom" } },

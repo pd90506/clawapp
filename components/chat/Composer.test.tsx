@@ -1,7 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Composer } from "./Composer";
+import { Composer, modelDisplayName } from "./Composer";
+
+describe("modelDisplayName", () => {
+  it("keeps a genuine alias (alias ≠ provider)", () => {
+    expect(modelDisplayName({ id: "claude-opus-4-8", label: "opus", provider: "anthropic" })).toBe("opus");
+  });
+  it("falls back to the id when the label is just the provider/brand", () => {
+    expect(modelDisplayName({ id: "deepseek-v4-flash", label: "DeepSeek", provider: "deepseek" })).toBe("deepseek-v4-flash");
+  });
+  it("uses the id when there is no label", () => {
+    expect(modelDisplayName({ id: "deepseek-v4-pro", label: "", provider: "deepseek" })).toBe("deepseek-v4-pro");
+  });
+});
 
 const MOCK_MODELS = [
   { id: "kimi/kimi-code", label: "Kimi", isDefault: true },

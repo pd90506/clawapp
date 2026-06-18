@@ -4,14 +4,18 @@ import userEvent from "@testing-library/user-event";
 import { SidebarHeader } from "./SidebarHeader";
 
 describe("SidebarHeader", () => {
-  it("calls onNewChat when + clicked", async () => {
-    const onNewChat = vi.fn();
-    render(<SidebarHeader onNewChat={onNewChat} onCollapse={() => {}} disabled={false} />);
-    await userEvent.click(screen.getByRole("button", { name: /new chat/i }));
-    expect(onNewChat).toHaveBeenCalled();
+  it("renders the title and a collapse control only (no add/settings)", () => {
+    render(<SidebarHeader onCollapse={() => {}} />);
+    expect(screen.getByText("Chats")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /collapse sidebar/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /new chat/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /settings/i })).toBeNull();
   });
-  it("disables new chat when disabled prop is true", () => {
-    render(<SidebarHeader onNewChat={() => {}} onCollapse={() => {}} disabled={true} />);
-    expect(screen.getByRole("button", { name: /new chat/i })).toBeDisabled();
+
+  it("calls onCollapse when the collapse control is clicked", async () => {
+    const onCollapse = vi.fn();
+    render(<SidebarHeader onCollapse={onCollapse} />);
+    await userEvent.click(screen.getByRole("button", { name: /collapse sidebar/i }));
+    expect(onCollapse).toHaveBeenCalled();
   });
 });

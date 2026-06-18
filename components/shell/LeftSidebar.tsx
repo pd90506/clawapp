@@ -2,23 +2,20 @@
 import { SidebarHeader } from "@/components/sidebar/SidebarHeader";
 import { SessionList } from "@/components/sidebar/SessionList";
 import { useGatewayHealth } from "@/hooks/useGatewayHealth";
-import { LinkIcon, ActivityIcon, ClockIcon, ArchiveIcon } from "./Icons";
+import { LinkIcon, ActivityIcon, ClockIcon, CogIcon } from "./Icons";
 
 type Props = {
   activeSessionId: string | null;
   pinnedIds: Set<string>;
   onSelectSession: (id: string) => void;
   onTogglePin: (id: string) => void;
-  onDeleteSession: (id: string) => void;
-  onNewChat: () => void;
   onCollapse: () => void;
-  newChatDisabled: boolean;
   refreshNonce?: number;
 };
 
 export function LeftSidebar({
-  activeSessionId, pinnedIds, onSelectSession, onTogglePin, onDeleteSession,
-  onNewChat, onCollapse, newChatDisabled, refreshNonce,
+  activeSessionId, pinnedIds, onSelectSession, onTogglePin,
+  onCollapse, refreshNonce,
 }: Props) {
   const health = useGatewayHealth();
 
@@ -41,7 +38,7 @@ export function LeftSidebar({
 
   return (
     <aside className="rail">
-      <SidebarHeader onNewChat={onNewChat} onCollapse={onCollapse} disabled={newChatDisabled} />
+      <SidebarHeader onCollapse={onCollapse} />
 
       {/* Socket card */}
       <button className="socket-card" type="button" onClick={handleSocketClick}>
@@ -69,15 +66,21 @@ export function LeftSidebar({
           pinnedIds={pinnedIds}
           onSelect={onSelectSession}
           onTogglePin={onTogglePin}
-          onDelete={onDeleteSession}
           refreshNonce={refreshNonce}
         />
       </div>
 
-      {/* Footer */}
+      {/* Footer — settings lives here (placeholder until the panel ships) */}
       <div className="rail-foot">
-        <button className="icon-btn" type="button" title="Archive">
-          <ArchiveIcon size={16} />
+        <button
+          className="icon-btn"
+          type="button"
+          aria-label="Settings"
+          disabled
+          title="Coming in v1.3"
+          style={{ opacity: 0.4, cursor: "not-allowed" }}
+        >
+          <CogIcon size={16} />
         </button>
       </div>
     </aside>

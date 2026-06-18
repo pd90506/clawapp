@@ -46,10 +46,12 @@ describe("POST /api/chat", () => {
     expect(r.status).toBe(400);
   });
 
-  it("triggers patchSessionLabel after first send when label is 'New chat'", async () => {
+  it("falls back to truncated user text when summarization is unavailable", async () => {
+    // Mock has no createSession/deleteSession, so summarizeChatTitle returns null
+    // and the route patches with the truncated user text.
     const patchSessionLabel = vi.fn(async () => undefined);
     vi.mocked(getClient).mockReturnValue({
-      listSessions: async () => [{ id: "web:abc", title: "New chat" }],
+      listSessions: async () => [{ id: "web:abc", title: "New chat ab12" }],
       async *sendMessage() { yield { type: "done" } as const; },
       patchSessionLabel,
     } as never);
@@ -57,14 +59,67 @@ describe("POST /api/chat", () => {
       method: "POST",
       body: JSON.stringify({ sessionId: "web:abc", text: "Hello world" }),
     }));
-    // Drain SSE
     const reader = r.body!.getReader(); while (!(await reader.read()).done) { /* drain */ }
-    // Give the fire-and-forget patch a tick
-    await new Promise((res) => setTimeout(res, 30));
     expect(patchSessionLabel).toHaveBeenCalledWith("web:abc", "Hello world");
   });
 
-  it("does NOT patch when current title is not 'New chat'", async () => {
+  it("uses AI summary when summarization succeeds", async () => {
+    const patchSessionLabel = vi.fn(async () => undefined);
+    const deleteSession = vi.fn(async () => undefined);
+    let sendCall = 0;
+    vi.mocked(getClient).mockReturnValue({
+      listSessions: async () => [{ id: "web:abc", title: "New chat ab12" }],
+      createSession: async () => ({ id: "web:summary", title: "tmp" }),
+      deleteSession,
+      patchSessionLabel,
+      async *sendMessage() {
+        sendCall++;
+        if (sendCall === 1) yield { type: "done" } as const;       // primary chat
+        else { yield { type: "token", text: "Refactor session label flow" } as const; yield { type: "done" } as const; } // summary
+      },
+    } as never);
+    const r = await POST(new Request("http://x", {
+      method: "POST",
+      body: JSON.stringify({ sessionId: "web:abc", text: "Hi there" }),
+    }));
+    const reader = r.body!.getReader(); while (!(await reader.read()).done) { /* drain */ }
+    expect(patchSessionLabel).toHaveBeenCalledWith("web:abc", "Refactor session label flow");
+    expect(deleteSession).toHaveBeenCalledWith("web:summary");
+  });
+
+  it("uses replaced assistant text when generating a session title", async () => {
+    const patchSessionLabel = vi.fn(async () => undefined);
+    let summaryPrompt = "";
+    let sendCall = 0;
+    vi.mocked(getClient).mockReturnValue({
+      listSessions: async () => [{ id: "web:abc", title: "New chat ab12" }],
+      createSession: async () => ({ id: "web:summary", title: "tmp" }),
+      deleteSession: async () => undefined,
+      patchSessionLabel,
+      async *sendMessage(_sessionId: string, text: string) {
+        sendCall++;
+        if (sendCall === 1) {
+          yield { type: "token", text: "helo" } as const;
+          yield { type: "replace", text: "hello" } as const;
+          yield { type: "done" } as const;
+        } else {
+          summaryPrompt = text;
+          yield { type: "token", text: "Greeting" } as const;
+          yield { type: "done" } as const;
+        }
+      },
+    } as never);
+    const r = await POST(new Request("http://x", {
+      method: "POST",
+      body: JSON.stringify({ sessionId: "web:abc", text: "Hi there" }),
+    }));
+    const reader = r.body!.getReader(); while (!(await reader.read()).done) { /* drain */ }
+    expect(summaryPrompt).toContain("Assistant: hello");
+    expect(summaryPrompt).not.toContain("Assistant: helohello");
+    expect(patchSessionLabel).toHaveBeenCalledWith("web:abc", "Greeting");
+  });
+
+  it("does NOT patch when current title doesn't match placeholder pattern", async () => {
     const patchSessionLabel = vi.fn(async () => undefined);
     vi.mocked(getClient).mockReturnValue({
       listSessions: async () => [{ id: "web:abc", title: "Already named" }],
@@ -76,7 +131,6 @@ describe("POST /api/chat", () => {
       body: JSON.stringify({ sessionId: "web:abc", text: "Hello" }),
     }));
     const reader = r.body!.getReader(); while (!(await reader.read()).done) { /* drain */ }
-    await new Promise((res) => setTimeout(res, 30));
     expect(patchSessionLabel).not.toHaveBeenCalled();
   });
 });

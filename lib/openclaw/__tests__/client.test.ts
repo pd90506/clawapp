@@ -184,6 +184,53 @@ describe("createClient — listAgents and createSession", () => {
   });
 });
 
+describe("createClient — resolveAgentSession", () => {
+  it("creates app:<agent> session when none exists", async () => {
+    let createParams: unknown = null;
+    gw.onClient((c) => {
+      c.onRequest(async (method, params) => {
+        if (method === "sessions.list") return { ok: true, payload: { sessions: [
+          { key: "agent:silver-wolf:telegram:direct:1", displayName: "Telegram" },
+        ]}};
+        if (method === "sessions.create") {
+          createParams = params;
+          return { ok: true, payload: { key: (params as { key: string }).key, displayName: "silver-wolf" } };
+        }
+        return { ok: false, error: { message: "no" } };
+      });
+    });
+    const conn = GatewayConnection.fromConfig({ url: gw.httpUrl, token: "t", source: "file" });
+    await conn.ready();
+    const c = createClient(conn);
+    const r = await c.resolveAgentSession("silver-wolf");
+    expect(r.id).toBe("app:silver-wolf");
+    expect((createParams as { key: string }).key).toBe("app:silver-wolf");
+    expect((createParams as { agentId: string }).agentId).toBe("silver-wolf");
+    await conn.close();
+  });
+
+  it("reuses the existing app:<agent> session and never creates", async () => {
+    let createCalled = false;
+    gw.onClient((c) => {
+      c.onRequest(async (method) => {
+        if (method === "sessions.list") return { ok: true, payload: { sessions: [
+          { key: "agent:main:app:main", displayName: "Main app" },
+          { key: "agent:main:telegram:direct:1", displayName: "Telegram" },
+        ]}};
+        if (method === "sessions.create") { createCalled = true; return { ok: true, payload: { key: "agent:main:app:main" } }; }
+        return { ok: false, error: { message: "no" } };
+      });
+    });
+    const conn = GatewayConnection.fromConfig({ url: gw.httpUrl, token: "t", source: "file" });
+    await conn.ready();
+    const c = createClient(conn);
+    const r = await c.resolveAgentSession("main");
+    expect(r).toEqual({ id: "agent:main:app:main", title: "Main app" });
+    expect(createCalled).toBe(false);
+    await conn.close();
+  });
+});
+
 describe("createClient — listModels", () => {
   it("returns models with isDefault flag derived from defaultModel field", async () => {
     gw.onClient((c) => {
