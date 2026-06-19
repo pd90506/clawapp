@@ -20,21 +20,33 @@ function streamFromFrames(frames: { event: string; data: unknown }[]): Response 
  * - GET /api/sessions/<id> → returns history JSON (default empty)
  * - POST /api/chat        → returns the supplied SSE stream (fresh per call)
  */
+type ThreadRow = { role: "user" | "assistant" | "system" | "divider"; text: string; at: number };
+
+/**
+ * Routes fetch calls for Model B:
+ * - GET  /api/agents/<agent>/thread → stitched thread JSON ({ activeId, messages })
+ * - POST /api/agents/<agent>/new    → the new active session summary ({ id })
+ * - POST /api/chat                  → the supplied SSE stream (fresh per call)
+ */
 function routedFetch(opts: {
-  history?: { role: "user" | "assistant" | "system"; text: string; at: number }[];
+  thread?: { activeId: string; messages: ThreadRow[] };
+  newSession?: { id: string };
   chatFrames?: { event: string; data: unknown }[];
   chatBuilder?: (init?: RequestInit) => Response;
 }) {
   return vi.fn().mockImplementation((url: string, init?: RequestInit) => {
-    if (typeof url === "string" && url.startsWith("/api/sessions/")) {
-      return Promise.resolve(new Response(JSON.stringify({ messages: opts.history ?? [] }), { status: 200 }));
+    if (typeof url === "string" && /\/thread$/.test(url)) {
+      return Promise.resolve(new Response(JSON.stringify(opts.thread ?? { activeId: "a", messages: [] }), { status: 200 }));
+    }
+    if (typeof url === "string" && /\/new$/.test(url)) {
+      return Promise.resolve(new Response(JSON.stringify(opts.newSession ?? { id: "agent:s1:app:s1:1000" }), { status: 200 }));
     }
     if (opts.chatBuilder) return Promise.resolve(opts.chatBuilder(init));
     return Promise.resolve(streamFromFrames(opts.chatFrames ?? []));
   });
 }
 
-beforeEach(() => { vi.unstubAllGlobals(); });
+beforeEach(() => { vi.unstubAllGlobals(); window.localStorage?.clear(); });
 
 describe("useChat", () => {
   it("optimistically appends user message and streams assistant tokens", async () => {
@@ -144,40 +156,64 @@ describe("useChat", () => {
     await waitFor(() => expect(result.current.messages).toEqual([]));
   });
 
-  it("loads chat history when sessionId is set", async () => {
+  it("loads the agent's stitched thread, mapping dividers and dropping noise", async () => {
     vi.stubGlobal("fetch", routedFetch({
-      history: [
+      thread: { activeId: "agent:s1:app:s1:9", messages: [
         { role: "user", text: "Earlier question", at: 1000 },
         { role: "assistant", text: "Earlier answer", at: 1010 },
-        { role: "system", text: "tool stuff", at: 1005 },  // skipped
-        { role: "assistant", text: "", at: 1020 },         // skipped (empty)
-      ],
+        { role: "divider", text: "New session started", at: 0 },
+        { role: "assistant", text: "", at: 1020 }, // skipped (empty)
+      ]},
     }));
-    const { result } = renderHook(() => useChat("s1"));
+    const { result } = renderHook(() => useChat("agent:s1:app:s1"));
     await waitFor(() => {
-      expect(result.current.messages.length).toBe(2);
-      expect(result.current.messages[0]).toMatchObject({ role: "user", blocks: [{ kind: "text", md: "Earlier question" }] });
-      expect(result.current.messages[1]).toMatchObject({ role: "assistant", blocks: [{ kind: "text", md: "Earlier answer" }] });
+      const seq = result.current.messages.map((m) =>
+        m.divider ?? (m.blocks[0]?.kind === "text" ? m.blocks[0].md : undefined));
+      expect(seq).toEqual(["Earlier question", "Earlier answer", "New session started"]);
     });
   });
 
-  it("loads new history when sessionId changes", async () => {
+  it("/new mints a fresh session and stitches a divider, not a chat turn", async () => {
+    const fetchMock = routedFetch({
+      newSession: { id: "agent:s1:app:s1:1000" },
+      thread: { activeId: "agent:s1:app:s1:1000", messages: [
+        { role: "user", text: "old turn", at: 1 },
+        { role: "divider", text: "New session started", at: 0 },
+      ]},
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useChat("agent:s1:app:s1"));
+    await act(async () => { await result.current.send("/new"); });
+    await waitFor(() => {
+      expect(result.current.messages.some((m) => m.divider === "New session started")).toBe(true);
+    });
+    // The "/new" command is not echoed as a user bubble.
+    expect(result.current.messages.some((m) =>
+      m.blocks.some((b) => b.kind === "text" && b.md === "/new"))).toBe(false);
+    // It posts to the agent's /new endpoint and never sends a chat turn.
+    expect(fetchMock.mock.calls.some(([u, i]) =>
+      /\/api\/agents\/s1\/new$/.test(u as string) && (i as RequestInit)?.method === "POST")).toBe(true);
+    expect(fetchMock.mock.calls.some(([u]) => u === "/api/chat")).toBe(false);
+  });
+
+  it("reloads the thread when the agent changes", async () => {
     let callCount = 0;
     vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
-      if (url.startsWith("/api/sessions/")) {
+      const m = url.match(/\/api\/agents\/([^/]+)\/thread$/);
+      if (m) {
         callCount++;
-        const id = url.replace("/api/sessions/", "");
         return Promise.resolve(new Response(JSON.stringify({
-          messages: [{ role: "user", text: `hello from ${decodeURIComponent(id)}`, at: 1000 }],
+          activeId: `agent:${m[1]}:app:${m[1]}`,
+          messages: [{ role: "user", text: `hello from ${m[1]}`, at: 1000 }],
         }), { status: 200 }));
       }
       return Promise.resolve(new Response(""));
     }));
-    const { result, rerender } = renderHook(({ id }) => useChat(id), { initialProps: { id: "s1" } });
+    const { result, rerender } = renderHook(({ id }) => useChat(id), { initialProps: { id: "agent:s1:app:s1" } });
     await waitFor(() => {
       expect(result.current.messages[0]?.blocks[0]).toEqual({ kind: "text", md: "hello from s1" });
     });
-    rerender({ id: "s2" });
+    rerender({ id: "agent:s2:app:s2" });
     await waitFor(() => {
       expect(result.current.messages[0]?.blocks[0]).toEqual({ kind: "text", md: "hello from s2" });
     });

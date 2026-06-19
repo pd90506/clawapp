@@ -745,6 +745,26 @@ input, textarea { font: inherit; color: inherit; }
 }
 .composer textarea.scrolling::-webkit-scrollbar-thumb { background: var(--ink-5); }
 
+/* "/new" reset marker — a centered hairline + label between retained turns. */
+.session-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 760px;
+  margin: 20px auto;
+  color: var(--ink-3);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+.session-divider::before,
+.session-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.session-divider span { white-space: nowrap; }
+
 .composer-bar {
   display: flex; align-items: center; gap: 6px;
   margin-top: 10px;
@@ -825,6 +845,25 @@ input, textarea { font: inherit; color: inherit; }
   color: var(--ink-4);
   justify-self: end;
 }
+
+/* "/" command + skill autocomplete: scrollable, description truncates inline. */
+.cmd-menu { max-height: 320px; overflow-y: auto; min-width: 320px; }
+.cmd-menu .popmenu-item { grid-template-columns: minmax(0, auto) 1fr; }
+.cmd-menu .popmenu-item .cmd { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.cmd-menu .popmenu-item .desc {
+  justify-self: start;
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cmd-badge {
+  font-family: var(--font-mono);
+  font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--ink-4);
+  border: 1px solid var(--line); border-radius: 4px;
+  padding: 0 4px; line-height: 1.45;
+}
+.cmd-menu::-webkit-scrollbar { width: 8px; }
+.cmd-menu::-webkit-scrollbar-thumb { background: var(--ink-5); border-radius: 4px; }
 
 .effort-btn { gap: 6px; padding: 0 8px; }
 .effort-label {

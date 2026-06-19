@@ -20,10 +20,17 @@ const MOCK_MODELS = [
   { id: "gpt-5.5", label: "GPT 5.5", isDefault: false },
 ];
 
-function setupFetch(models = MOCK_MODELS) {
-  global.fetch = vi.fn().mockResolvedValue({
-    json: async () => ({ models }),
-  } as Response);
+const MOCK_COMMANDS = [
+  { name: "plan", description: "Break task into steps", source: "native" },
+  { name: "explain", description: "Explain selected code", source: "native" },
+  { name: "web", description: "Search the web", source: "skill" },
+];
+
+function setupFetch(models = MOCK_MODELS, commands = MOCK_COMMANDS) {
+  global.fetch = vi.fn().mockImplementation((url: string) => {
+    const body = typeof url === "string" && url.startsWith("/api/commands") ? { commands } : { models };
+    return Promise.resolve({ json: async () => body } as Response);
+  });
 }
 
 beforeEach(() => setupFetch());
@@ -68,29 +75,43 @@ describe("Composer", () => {
     expect(screen.getByRole("button", { name: /send/i })).toBeDisabled();
   });
 
-  it("clicking / button shows the slash commands popup", async () => {
+  it("typing / opens the command/skill autocomplete", async () => {
     render(<Composer onSend={() => {}} disabled={false} />);
-    // Popup not shown initially
     expect(screen.queryByText("/plan")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByTitle("Slash command"));
-    expect(screen.getByText("/plan")).toBeInTheDocument();
+    await userEvent.type(screen.getByRole("textbox"), "/");
+    expect(await screen.findByText("/plan")).toBeInTheDocument();
     expect(screen.getByText("/explain")).toBeInTheDocument();
   });
 
-  it("clicking a slash command inserts /<cmd> into the textarea", async () => {
+  it("filters the list as you type the command name", async () => {
     render(<Composer onSend={() => {}} disabled={false} />);
-    await userEvent.click(screen.getByTitle("Slash command"));
-    await userEvent.click(screen.getByRole("menuitem", { name: /\/plan/i }));
-    const ta = screen.getByRole("textbox") as HTMLTextAreaElement;
-    expect(ta.value).toBe("/plan ");
+    await userEvent.type(screen.getByRole("textbox"), "/ex");
+    expect(await screen.findByText("/explain")).toBeInTheDocument();
+    expect(screen.queryByText("/plan")).not.toBeInTheDocument();
   });
 
-  it("clicking outside the popup closes it", async () => {
+  it("clicking a command inserts /<name> into the textarea", async () => {
     render(<Composer onSend={() => {}} disabled={false} />);
-    await userEvent.click(screen.getByTitle("Slash command"));
-    expect(screen.getByText("/plan")).toBeInTheDocument();
-    // Click outside (on the body)
-    await userEvent.click(document.body);
+    await userEvent.type(screen.getByRole("textbox"), "/");
+    await userEvent.click(await screen.findByRole("menuitem", { name: /\/plan/i }));
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("/plan ");
+  });
+
+  it("Enter accepts the highlighted command instead of sending", async () => {
+    const onSend = vi.fn();
+    render(<Composer onSend={onSend} disabled={false} />);
+    await userEvent.type(screen.getByRole("textbox"), "/ex");
+    expect(await screen.findByText("/explain")).toBeInTheDocument();
+    await userEvent.keyboard("{Enter}");
+    expect(onSend).not.toHaveBeenCalled();
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("/explain ");
+  });
+
+  it("Escape dismisses the autocomplete", async () => {
+    render(<Composer onSend={() => {}} disabled={false} />);
+    await userEvent.type(screen.getByRole("textbox"), "/");
+    expect(await screen.findByText("/plan")).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
     expect(screen.queryByText("/plan")).not.toBeInTheDocument();
   });
 });

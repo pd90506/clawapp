@@ -39,6 +39,7 @@ function ActiveChat({ sessionId, composerDisabled, onTurnComplete }: { sessionId
         onSend={send}
         disabled={composerDisabled || isStreaming}
         streaming={isStreaming}
+        agentId={agentId ?? undefined}
       />
     </div>
   );

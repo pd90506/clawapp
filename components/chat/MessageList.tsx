@@ -78,6 +78,13 @@ export function MessageList({ messages, status, sessionId, agentName, agentAvata
     <div className="thread" ref={scrollRef} onScroll={handleScroll}>
       <div className="thread-inner" ref={innerRef}>
         {grouped.map(({ dayLabel, message }, i) => {
+          if (message.divider) {
+            return (
+              <div key={message.id} className="session-divider">
+                <span>{message.divider}</span>
+              </div>
+            );
+          }
           const isLastAssistant = message.role === "assistant" && i === grouped.length - 1;
           const rendered = (isLastAssistant && status === "streaming")
             ? <StreamingMessage key={message.id} message={message} agentName={agentName} agentAvatarUrl={agentAvatarUrl} />

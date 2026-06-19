@@ -5,6 +5,7 @@ import { useAgentNames } from "@/hooks/useAgentNames";
 import { useAgentAvatars } from "@/hooks/useAgentAvatars";
 import { useAgentReads } from "@/hooks/useAgentReads";
 import { fileToAvatarDataUrl } from "@/lib/avatar";
+import { familyAgentId } from "@/lib/openclaw/sessionFamily";
 
 type Props = {
   activeSessionId: string | null;
@@ -25,8 +26,9 @@ const APP_PREFIX = "app:";
 // the row id so pin/delete target the real session.
 const canonicalAppKey = (agentId: string) => `agent:${agentId}:${APP_PREFIX}${agentId}`;
 const sessionAgent = (key: string | null): string | null => key?.match(/^agent:([^:]+):/)?.[1] ?? null;
-// An agent's own app session, e.g. `agent:silver-wolf:app:silver-wolf` → "silver-wolf".
-const appSessionAgent = (key: string): string | null => key.match(/^agent:([^:]+):app:\1$/)?.[1] ?? null;
+// An agent's app session — any member of its `/new` chain (original or a
+// time-stamped successor) maps back to the agent for activity/unread tracking.
+const appSessionAgent = (key: string): string | null => familyAgentId(key);
 
 // Telegram-style sidebar: one row per agent (a "contact"), each backed by that
 // agent's single app-owned session `app:<agent>`. Rows come from the agent roster
@@ -64,7 +66,8 @@ export function SessionList({ activeSessionId, pinnedIds, onSelect, onTogglePin,
         const act: Record<string, number> = {};
         for (const s of (sj.sessions ?? []) as RawSession[]) {
           const agent = appSessionAgent(s.id);
-          if (agent && typeof s.updatedAt === "number") act[agent] = s.updatedAt;
+          // An agent may own several chain members; track the most recent activity.
+          if (agent && typeof s.updatedAt === "number") act[agent] = Math.max(act[agent] ?? 0, s.updatedAt);
         }
         setActivity(act);
       } catch {

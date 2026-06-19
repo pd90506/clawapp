@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { parseSseChunks } from "./sseParse";
+import { familyAgentId } from "@/lib/openclaw/sessionFamily";
 
 export type Block =
   | { kind: "text"; md: string }
@@ -12,6 +13,11 @@ export type ChatMessage = {
   role: "user" | "assistant";
   blocks: Block[];
   error?: string;
+  // When set, this row renders as a centered "New session started" divider
+  // instead of a message bubble (see MessageList). It marks a session boundary
+  // in the agent's stitched thread — prior sessions sit above, the fresh
+  // (zero-context) session below.
+  divider?: string;
 };
 
 export type Status = "idle" | "streaming" | "error";
@@ -21,8 +27,11 @@ type ChatAction =
   | { type: "reset" }
   | { type: "loadHistory"; messages: ChatMessage[] }
   | { type: "appendMessages"; userMsg: ChatMessage; asst: ChatMessage }
+  | { type: "appendDivider"; divider: ChatMessage }
   | { type: "updateLast"; fn: (m: ChatMessage) => ChatMessage }
   | { type: "setStatus"; status: Status };
+
+const DIVIDER_LABEL = "New session started";
 
 function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
@@ -32,6 +41,8 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return { messages: action.messages, status: "idle" };
     case "appendMessages":
       return { ...state, messages: [...state.messages, action.userMsg, action.asst] };
+    case "appendDivider":
+      return { ...state, messages: [...state.messages, action.divider] };
     case "updateLast": {
       const ms = state.messages;
       if (!ms.length) return state;
@@ -44,15 +55,19 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
   }
 }
 
-type HistoryRow = { role: "user" | "assistant" | "system"; text: string; at: number };
+type ThreadRow = { role: "user" | "assistant" | "system" | "divider"; text: string; at: number };
 
-function rowsToMessages(rows: HistoryRow[]): ChatMessage[] {
-  // Show user + assistant turns. Skip empty rows and non-user/assistant roles
-  // (tool results, compaction markers, etc.) — they're already represented by
-  // the assistant text or aren't useful as standalone bubbles.
+function threadToMessages(rows: ThreadRow[]): ChatMessage[] {
+  // Map the gateway-stitched thread to render rows. `divider` rows mark session
+  // boundaries; user/assistant rows become bubbles; anything else is dropped (the
+  // server already display-normalized control/bootstrap rows).
   const out: ChatMessage[] = [];
   let i = 0;
   for (const r of rows) {
+    if (r.role === "divider") {
+      out.push({ id: `divider-${++i}`, role: "assistant", blocks: [], divider: r.text || DIVIDER_LABEL });
+      continue;
+    }
     if (r.role !== "user" && r.role !== "assistant") continue;
     if (!r.text || r.text.trim().length === 0) continue;
     out.push({ id: `h-${++i}-${r.at}`, role: r.role, blocks: [{ kind: "text", md: r.text }] });
@@ -63,28 +78,41 @@ function rowsToMessages(rows: HistoryRow[]): ChatMessage[] {
 export function useChat(sessionId: string, onTurnComplete?: () => void) {
   const [{ messages, status }, dispatch] = useReducer(chatReducer, { messages: [], status: "idle" });
   const abortRef = useRef<AbortController | null>(null);
+  // The chain member new turns target. The agent owns a chain of app sessions
+  // (one per /new); this tracks the active (newest) one, refreshed from the
+  // stitched thread and rotated forward on /new.
+  const activeIdRef = useRef<string>(sessionId);
   const idRef = useRef(0);
   const newId = () => `m-${++idRef.current}`;
+  const agentId = familyAgentId(sessionId);
 
   // Abort in-flight stream on unmount
   useEffect(() => () => { abortRef.current?.abort(); }, []);
 
-  // Abort, reset, and load history when sessionId changes
+  // Fetch the agent's full stitched thread (every chain member + dividers) and
+  // remember the active session. Used on open and after /new.
+  const loadThread = useCallback(async (signal?: { cancelled: boolean }) => {
+    if (!agentId) return;
+    try {
+      const r = await fetch(`/api/agents/${encodeURIComponent(agentId)}/thread`);
+      if (!r.ok || signal?.cancelled) return;
+      const j = await r.json() as { activeId?: string; messages?: ThreadRow[] };
+      if (signal?.cancelled) return;
+      if (j.activeId) activeIdRef.current = j.activeId;
+      dispatch({ type: "loadHistory", messages: threadToMessages(j.messages ?? []) });
+    } catch { /* keep buffer; status banner already covers errors */ }
+  }, [agentId]);
+
+  // Abort, reset, and load the thread when the agent/session changes.
   useEffect(() => {
     abortRef.current?.abort();
     dispatch({ type: "reset" });
+    activeIdRef.current = sessionId;
     if (!sessionId) return;
-    let cancelled = false;
-    fetch(`/api/sessions/${encodeURIComponent(sessionId)}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((j: { messages?: HistoryRow[] }) => {
-        if (cancelled) return;
-        const ms = rowsToMessages(j.messages ?? []);
-        if (ms.length > 0) dispatch({ type: "loadHistory", messages: ms });
-      })
-      .catch(() => { /* keep empty buffer; status banner already covers errors */ });
-    return () => { cancelled = true; };
-  }, [sessionId]);
+    const sig = { cancelled: false };
+    loadThread(sig);
+    return () => { sig.cancelled = true; };
+  }, [sessionId, loadThread]);
 
   const updateLast = useCallback((fn: (m: ChatMessage) => ChatMessage) => {
     dispatch({ type: "updateLast", fn });
@@ -144,7 +172,26 @@ export function useChat(sessionId: string, onTurnComplete?: () => void) {
     }
   }, [updateLast, onTurnComplete]);
 
+  // "/new" — mint a genuinely fresh (zero-context) session for this agent. Prior
+  // sessions stay listed and are stitched above a "New session started" divider;
+  // new turns target the new member. The command isn't echoed as a bubble.
+  const newSession = useCallback(async () => {
+    if (!agentId) return;
+    try {
+      const r = await fetch(`/api/agents/${encodeURIComponent(agentId)}/new`, { method: "POST" });
+      if (!r.ok) return;
+      const j = await r.json() as { id?: string };
+      if (j.id) activeIdRef.current = j.id; // new turns target the fresh session
+    } catch { return; /* leave the thread untouched if the create failed */ }
+    // Append the boundary in place — keeping the already-loaded (normalized) prior
+    // sessions above. We don't re-fetch the thread here: a brand-new session has no
+    // transcript yet and may not be listed, which would wipe this divider. On the
+    // next open/reload getAgentThread reconstructs the chain from the gateway.
+    dispatch({ type: "appendDivider", divider: { id: `divider-live-${newId()}`, role: "assistant", blocks: [], divider: DIVIDER_LABEL } });
+  }, [agentId]);
+
   const send = useCallback(async (text: string) => {
+    if (/^\/new(\s|$)/i.test(text.trim())) { await newSession(); return; }
     const userMsg: ChatMessage = { id: newId(), role: "user", blocks: [{ kind: "text", md: text }] };
     const asst: ChatMessage = { id: newId(), role: "assistant", blocks: [] };
     dispatch({ type: "appendMessages", userMsg, asst });
@@ -157,7 +204,7 @@ export function useChat(sessionId: string, onTurnComplete?: () => void) {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionId, text }),
+        body: JSON.stringify({ sessionId: activeIdRef.current, text }),
         signal: ac.signal,
       });
       if (!res.ok || !res.body) {
@@ -179,7 +226,7 @@ export function useChat(sessionId: string, onTurnComplete?: () => void) {
         handleEvent("error", { message: (e as Error).message });
       }
     }
-  }, [handleEvent, sessionId]);
+  }, [handleEvent, newSession]);
 
   return { messages, status, send };
 }
