@@ -2,17 +2,24 @@
   "name": "clawapp",
   "version": "0.1.0",
   "private": true,
+  "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
     "dev:preview": "NEXT_PREVIEW=1 next dev",
     "build": "next build",
+    "build:standalone": "next build && node electron/prepare-standalone.mjs",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test e2e/chat.spec.ts e2e/scroll.spec.ts",
+    "screenshots": "playwright test e2e/screenshots.spec.ts",
+    "electron": "electron .",
+    "electron:dev": "concurrently -k -n next,electron -c blue,magenta \"next dev\" \"electron .\"",
+    "dist": "pnpm build:standalone && electron-builder",
+    "dist:dir": "pnpm build:standalone && electron-builder --dir"
   },
   "dependencies": {
     "isomorphic-dompurify": "^3.12.0",
@@ -40,6 +47,9 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.1",
     "@vitest/ui": "^4.1.5",
+    "concurrently": "^10.0.3",
+    "electron": "^42.4.1",
+    "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.5",
     "jsdom": "^29.1.1",
@@ -52,5 +62,43 @@
       "sharp",
       "unrs-resolver"
     ]
+  },
+  "build": {
+    "appId": "ai.openclaw.clawapp",
+    "productName": "Clawapp",
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".next/clawapp-server.tgz",
+        "to": "clawapp-server.tgz"
+      }
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "linux": {
+      "category": "Development",
+      "target": [
+        "AppImage"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
   }
 }

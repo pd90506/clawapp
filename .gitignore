@@ -14,6 +14,7 @@
 /coverage
 /test-results
 /playwright-report
+/e2e/screens/
 
 # next.js
 /.next/
@@ -22,6 +23,9 @@
 
 # production
 /build
+
+# electron
+/dist-electron/
 
 # misc
 .DS_Store

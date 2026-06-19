@@ -2,8 +2,8 @@ import { test, expect } from "@playwright/test";
 
 test("send a message, see streamed response with tool call", async ({ page }) => {
   await page.goto("/");
-  // The shell opens with no session selected; click the first session in the sidebar.
-  await page.getByText("Test").click({ timeout: 10_000 });
+  // The shell opens with no session selected; click an agent row in the sidebar.
+  await page.getByText("main", { exact: true }).click({ timeout: 10_000 });
   const composer = page.getByRole("textbox", { name: "Message input" });
   await expect(composer).toBeEnabled({ timeout: 15_000 });
   await composer.fill("hi");

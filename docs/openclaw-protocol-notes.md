@@ -1,7 +1,8 @@
 # openclaw gateway protocol — implementation notes
 
-<!-- Generated from dist source reading on 2026-05-08. All line refs are to
-     /opt/homebrew/lib/node_modules/openclaw/dist/ unless otherwise noted. -->
+<!-- Generated from dist source reading on 2026-05-08. Updated for OpenClaw
+     2026.5.22 protocol v4 on 2026-05-27. Line refs are to the installed
+     openclaw package/dist unless otherwise noted. -->
 
 ## Frame envelope
 
@@ -77,8 +78,12 @@ exported from the same bundle (e.g. `ErrorCodes.INVALID_REQUEST`, `ErrorCodes.UN
 ```
 
 Cross-reference: `docs/gateway/protocol.md:27-98`. `HelloOkSchema` in
-`dist/protocol-MvVoNN0Z.js`. All of `server`, `features`, `snapshot`, `auth`,
-`policy` are required by the schema.
+`dist/plugin-sdk/src/gateway/protocol/schema/frames.d.ts`. All of `server`,
+`features`, `snapshot`, `auth`, and `policy` are required by the schema.
+OpenClaw 2026.5.22 exports `PROTOCOL_VERSION = 4`, `MIN_CLIENT_PROTOCOL_VERSION = 4`,
+and `MIN_PROBE_PROTOCOL_VERSION = 4`; gateways reject client ranges that do not
+include protocol 4. `minProtocol: 3, maxProtocol: 4` keeps this client compatible
+with v4 gateways while preserving the declared range used in the upstream docs.
 
 **Protocol version negotiation (verified against openclaw 2026.6.6, 2026-06-16).**
 The gateway now requires protocol **4** (`PROTOCOL_VERSION = 4`,
@@ -473,10 +478,12 @@ sessionSubscribers)` where `sessionSubscribers = sessionEventSubscribers.getAll(
    the text may be in `content` (string or array of content blocks) not `text`. The
    adapter must handle both.
 
-7. **`chat` delta events carry accumulated text, not incremental chunks.** The `text`
-   in a `state:"delta"` `chat` event is the full assistant reply so far (merged buffer),
-   not just the new tokens added since the last delta. The adapter should replace the
-   previous text with the new value, not append.
+7. **Protocol v4 `chat` delta events carry explicit `deltaText`.** Current v4
+   delta payloads include `deltaText`; `message` remains an optional cumulative
+   assistant snapshot. Normal deltas should append `deltaText`. Non-prefix edits set
+   `replace: true` and use `deltaText` as the replacement text for the current
+   assistant text. Older v3-style events may omit `deltaText`; for those, diff the
+   cumulative `message` text against the per-run previous text.
 
 8. **`sessions.messages.subscribe` / `unsubscribe` use `key` not `sessionKey`.** The
    schema field is `key` (not `sessionKey` as used in `chat.send` and `chat.history`).

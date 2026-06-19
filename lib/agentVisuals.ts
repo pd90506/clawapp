@@ -14,3 +14,12 @@ export function agentVisual(agentId: string): { color: string; initial: string }
   const initial = (agentId[0] ?? "?").toUpperCase();
   return { color, initial };
 }
+
+// Pull the agent id out of a session key. The gateway namespaces created keys as
+// `agent:<id>:app:<id>`, but a freshly-created session can still surface in the
+// bare `app:<id>` form — match both so the chat resolves the agent (and its
+// name/avatar) either way instead of falling back to "Assistant".
+export function agentIdFromSessionKey(key: string | null): string | null {
+  if (!key) return null;
+  return key.match(/^agent:([^:]+):/)?.[1] ?? key.match(/^app:([^:]+)$/)?.[1] ?? null;
+}

@@ -18,6 +18,20 @@ function chatEvent(state: "delta" | "final" | "error" | "aborted", text: string,
   };
 }
 
+function chatV4Delta(deltaText: string, opts: Partial<{ runId: string; replace: boolean }> = {}): TranscriptEvent {
+  return {
+    kind: "chat",
+    data: {
+      runId: opts.runId ?? "r1",
+      sessionKey: "s1",
+      seq: 0,
+      state: "delta",
+      deltaText,
+      replace: opts.replace,
+    } as never,
+  };
+}
+
 function toolEvent(phase: "start" | "result", opts: { id?: string; name?: string; args?: unknown; result?: unknown; isError?: boolean; meta?: string } = {}): TranscriptEvent {
   return {
     kind: "tool",
@@ -36,6 +50,16 @@ function toolEvent(phase: "start" | "result", opts: { id?: string; name?: string
         isError: opts.isError,
         meta: opts.meta,
       },
+    } as never,
+  };
+}
+
+function sessionMessage(role: string, text: string): TranscriptEvent {
+  return {
+    kind: "message",
+    data: {
+      sessionKey: "s1",
+      message: { role, content: [{ type: "text", text }], timestamp: 1 },
     } as never,
   };
 }
@@ -73,6 +97,41 @@ describe("adapter.adaptTranscriptEvent", () => {
       { type: "token", text: "hello" },
       { type: "token", text: " world" },
       { type: "done" },
+    ]);
+  });
+
+  it("uses protocol v4 deltaText directly for incremental chat tokens", () => {
+    const out = run([
+      chatV4Delta("he"),
+      chatV4Delta("llo"),
+      chatEvent("final", "hello"),
+    ]);
+    expect(out).toEqual([
+      { type: "token", text: "he" },
+      { type: "token", text: "llo" },
+      { type: "done" },
+    ]);
+  });
+
+  it("maps protocol v4 replacement deltas to replace events", () => {
+    const out = run([
+      chatV4Delta("helo"),
+      chatV4Delta("hello", { replace: true }),
+    ]);
+    expect(out).toEqual([
+      { type: "token", text: "helo" },
+      { type: "replace", text: "hello" },
+    ]);
+  });
+
+  it("maps non-prefix v3 cumulative snapshots to replace events", () => {
+    const out = run([
+      chatEvent("delta", "helo"),
+      chatEvent("delta", "hello"),
+    ]);
+    expect(out).toEqual([
+      { type: "token", text: "helo" },
+      { type: "replace", text: "hello" },
     ]);
   });
 
@@ -116,12 +175,30 @@ describe("adapter.adaptTranscriptEvent", () => {
     expect(out).toEqual([{ type: "tool_result", id: "t1", error: "tool failed" }]);
   });
 
-  it("ignores session.message events (handled by chat events instead)", () => {
-    const ev: TranscriptEvent = {
-      kind: "message",
-      data: { sessionKey: "s1", message: { role: "assistant", content: "hello", timestamp: 1 } } as never,
-    };
-    const out = run([ev]);
+  it("uses assistant session.message events as a final text fallback", () => {
+    const out = run([
+      sessionMessage("assistant", "hello after thinking"),
+      chatEvent("final", ""),
+    ]);
+    expect(out).toEqual([
+      { type: "replace", text: "hello after thinking" },
+      { type: "done" },
+    ]);
+  });
+
+  it("does not duplicate text when a non-empty chat final follows session.message fallback", () => {
+    const out = run([
+      sessionMessage("assistant", "hello after thinking"),
+      chatEvent("final", "hello after thinking"),
+    ]);
+    expect(out).toEqual([
+      { type: "replace", text: "hello after thinking" },
+      { type: "done" },
+    ]);
+  });
+
+  it("ignores non-assistant session.message events", () => {
+    const out = run([sessionMessage("user", "hello")]);
     expect(out).toEqual([]);
   });
 

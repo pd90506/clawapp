@@ -30,7 +30,7 @@ function CopyMessageButton({ blocks }: { blocks: ChatMessage["blocks"] }) {
   );
 }
 
-export function Message({ message }: { message: ChatMessage }) {
+export function Message({ message, agentName = "Assistant", agentAvatarUrl }: { message: ChatMessage; agentName?: string; agentAvatarUrl?: string }) {
   const isUser = message.role === "user";
 
   if (isUser) {
@@ -63,11 +63,17 @@ export function Message({ message }: { message: ChatMessage }) {
   }
 
   // Assistant message: avatar + body (no bubble, plain prose)
+  const avInitial = (agentName[0] ?? "?").toUpperCase();
   return (
     <div className="msg asst">
-      <div className="msg-av">O</div>
+      <div className="msg-av">
+        {agentAvatarUrl
+          // eslint-disable-next-line @next/next/no-img-element -- local data-URL avatar; next/image optimization doesn't apply
+          ? <img src={agentAvatarUrl} alt="" />
+          : avInitial}
+      </div>
       <div className="msg-body">
-        <div className="msg-name">OpenClaw</div>
+        <div className="msg-name">{agentName}</div>
         {message.blocks.map((b, i) => {
           if (b.kind === "thinking") {
             return <ThinkingPanel key={i} text={b.text} done={b.done} detail={b.detail} />;
@@ -81,6 +87,7 @@ export function Message({ message }: { message: ChatMessage }) {
                 done={b.done}
                 result={b.result}
                 error={b.error}
+                actor={agentName}
               />
             );
           }

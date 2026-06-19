@@ -6,15 +6,22 @@ type Effort = "low" | "medium" | "high" | "max";
 
 type ModelItem = { id: string; label: string; provider?: string; isDefault: boolean };
 
-type Props = { onSend: (text: string) => void; disabled: boolean; streaming?: boolean; onStop?: () => void };
+// The display name for a model row. A label that's just the provider/brand
+// (e.g. the config alias "DeepSeek" on a `deepseek` model) isn't a model name —
+// fall back to the concrete model id so the picker reads "deepseek-v4-flash",
+// not "DeepSeek". Genuine aliases like "opus" (provider "anthropic") are kept.
+export function modelDisplayName(m: { id: string; label?: string; provider?: string }): string {
+  const label = m.label?.trim();
+  if (!label) return m.id;
+  if (m.provider && label.toLowerCase() === m.provider.trim().toLowerCase()) return m.id;
+  return label;
+}
 
-const SLASH_COMMANDS = [
-  { cmd: "plan",    desc: "Break task into steps" },
-  { cmd: "explain", desc: "Explain selected code" },
-  { cmd: "rewrite", desc: "Rewrite for clarity" },
-  { cmd: "web",     desc: "Search the web" },
-  { cmd: "reset",   desc: "Start a new session" },
-];
+type Props = { onSend: (text: string) => void; disabled: boolean; streaming?: boolean; onStop?: () => void; agentId?: string };
+
+// A slash command (or skill — the gateway surfaces skills as commands too),
+// fetched live from /api/commands.
+type SlashCommand = { name: string; description?: string; source?: string };
 
 const ATTACH_ITEMS = [
   { key: "image", icon: "🖼", label: "Image",  hint: "png, jpg, gif, webp" },
@@ -41,12 +48,14 @@ function saveStoredModel(id: string) {
   try { localStorage.setItem(LS_KEY, id); } catch { /* ignore */ }
 }
 
-export function Composer({ onSend, disabled, streaming = false, onStop }: Props) {
+export function Composer({ onSend, disabled, streaming = false, onStop, agentId }: Props) {
   const [text, setText] = useState("");
   const [effort, setEffort] = useState<Effort>("medium");
   const [openMenu, setOpenMenu] = useState<"slash" | "plus" | "effort" | "model" | null>(null);
   const [models, setModels] = useState<ModelItem[]>([]);
   const [model, setModelState] = useState<string>("");
+  const [commands, setCommands] = useState<SlashCommand[]>([]);
+  const [cmdIndex, setCmdIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Fetch real models from openclaw on mount
@@ -73,6 +82,15 @@ export function Composer({ onSend, disabled, streaming = false, onStop }: Props)
     saveStoredModel(id);
   };
 
+  // Fetch the agent's available slash commands + skills for the "/" autocomplete.
+  useEffect(() => {
+    const url = agentId ? `/api/commands?agent=${encodeURIComponent(agentId)}` : "/api/commands";
+    fetch(url)
+      .then((r) => r.json())
+      .then((d: { commands?: SlashCommand[] }) => setCommands(d.commands ?? []))
+      .catch(() => setCommands([]));
+  }, [agentId]);
+
   // Auto-resize textarea
   useEffect(() => {
     const el = textareaRef.current;
@@ -80,6 +98,20 @@ export function Composer({ onSend, disabled, streaming = false, onStop }: Props)
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
   }, [text]);
+
+  // Reveal the scrollbar only while actively scrolling, then fade it back out.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const onScroll = () => {
+      el.classList.add("scrolling");
+      clearTimeout(timer);
+      timer = setTimeout(() => el.classList.remove("scrolling"), 700);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => { el.removeEventListener("scroll", onScroll); clearTimeout(timer); };
+  }, []);
 
   // Click-outside to close popmenus
   useEffect(() => {
@@ -93,6 +125,15 @@ export function Composer({ onSend, disabled, streaming = false, onStop }: Props)
 
   const ready = text.trim().length > 0 && !disabled;
 
+  // "/" autocomplete: active while the composer holds just a slash token (a
+  // leading "/" with no space yet). Filter by the partial name typed so far.
+  const slashQuery = /^\/(\S*)$/.exec(text)?.[1];
+  const filteredCommands = slashQuery === undefined ? []
+    : commands.filter((c) => c.name.toLowerCase().startsWith(slashQuery.toLowerCase())).slice(0, 50);
+  const showSlash = filteredCommands.length > 0;
+  // Keep the highlight in range as the query narrows the list.
+  useEffect(() => { setCmdIndex(0); }, [slashQuery]);
+
   const submit = () => {
     const t = text.trim();
     if (!t || disabled) return;
@@ -100,17 +141,29 @@ export function Composer({ onSend, disabled, streaming = false, onStop }: Props)
     setText("");
   };
 
+  const insertSlash = (name: string) => {
+    setText(`/${name} `);
+    setOpenMenu(null);
+    textareaRef.current?.focus();
+  };
+
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // While the "/" autocomplete is open, arrows move the highlight and
+    // Enter/Tab accept it (instead of sending); Escape dismisses.
+    if (showSlash) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setCmdIndex((i) => (i + 1) % filteredCommands.length); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setCmdIndex((i) => (i - 1 + filteredCommands.length) % filteredCommands.length); return; }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        insertSlash((filteredCommands[cmdIndex] ?? filteredCommands[0]).name);
+        return;
+      }
+      if (e.key === "Escape") { e.preventDefault(); setText(""); return; }
+    }
     if (e.key !== "Enter") return;
     if (e.shiftKey || e.altKey) return;
     e.preventDefault();
     submit();
-  };
-
-  const insertSlash = (cmd: string) => {
-    setText((v) => (v.endsWith(" ") || v === "" ? v : v + " ") + "/" + cmd + " ");
-    setOpenMenu(null);
-    textareaRef.current?.focus();
   };
 
   const currentEffortLabel = EFFORTS.find((e) => e.key === effort)?.label ?? "Medium";
@@ -130,29 +183,30 @@ export function Composer({ onSend, disabled, streaming = false, onStop }: Props)
           disabled={disabled}
         />
         <div className="composer-bar">
-          {/* Slash commands */}
+          {/* Slash commands / skills — autocomplete opens as you type "/". */}
           <div className="menu-anchor">
             <button
               type="button"
-              className={`cbtn icon-only ghost${openMenu === "slash" ? " active" : ""}`}
+              className={`cbtn icon-only ghost${showSlash ? " active" : ""}`}
               title="Slash command"
-              onClick={() => setOpenMenu(openMenu === "slash" ? null : "slash")}
+              onClick={() => { setText((t) => (t.startsWith("/") ? t : "/")); textareaRef.current?.focus(); }}
             >
               <SlashIcon size={13} />
             </button>
-            {openMenu === "slash" && (
-              <div className="popmenu" role="menu">
-                <div className="popmenu-head">Commands</div>
-                {SLASH_COMMANDS.map((c) => (
+            {showSlash && (
+              <div className="popmenu cmd-menu" role="menu">
+                <div className="popmenu-head">Commands &amp; skills</div>
+                {filteredCommands.map((c, i) => (
                   <button
-                    key={c.cmd}
+                    key={c.name}
                     type="button"
-                    className="popmenu-item"
+                    className={`popmenu-item${i === cmdIndex ? " on" : ""}`}
                     role="menuitem"
-                    onClick={() => insertSlash(c.cmd)}
+                    onMouseEnter={() => setCmdIndex(i)}
+                    onClick={() => insertSlash(c.name)}
                   >
-                    <span className="cmd">/{c.cmd}</span>
-                    <span className="desc">{c.desc}</span>
+                    <span className="cmd">/{c.name}{c.source === "skill" && <span className="cmd-badge">skill</span>}</span>
+                    <span className="desc">{c.description}</span>
                   </button>
                 ))}
               </div>
@@ -233,8 +287,8 @@ export function Composer({ onSend, disabled, streaming = false, onStop }: Props)
             >
               <span className="model-label">
                 {currentModel && currentModel.isDefault
-                  ? <>Default <span className="model-name">({currentModel.label})</span></>
-                  : <>{currentModel?.label ?? "Model"}</>}
+                  ? <>Default <span className="model-name">({modelDisplayName(currentModel)})</span></>
+                  : <>{currentModel ? modelDisplayName(currentModel) : "Model"}</>}
               </span>
               <span className="chev">˅</span>
             </button>
@@ -250,7 +304,7 @@ export function Composer({ onSend, disabled, streaming = false, onStop }: Props)
                     onClick={() => { setModel(m.id); setOpenMenu(null); }}
                   >
                     <span className="cmd">
-                      {m.label}
+                      {modelDisplayName(m)}
                       {m.isDefault && <span className="default-tag">Default</span>}
                     </span>
                     <span className="desc">{m.provider ?? ""}</span>

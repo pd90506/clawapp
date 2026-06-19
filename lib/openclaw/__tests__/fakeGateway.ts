@@ -1,4 +1,4 @@
-import { WebSocketServer, type WebSocket } from "ws";
+import { WebSocketServer } from "ws";
 import type { AddressInfo } from "node:net";
 
 export type FakeGateway = {
@@ -56,7 +56,7 @@ export async function startFakeGateway(): Promise<FakeGateway> {
             type: "res", id: frame.id, ok: true,
             payload: {
               type: "hello-ok",
-              protocol: 3,
+              protocol: 4,
               server: { version: "fake", connId: "c1" },
               features: { methods: ["health", "sessions.list", "chat.history", "chat.send", "chat.abort", "sessions.messages.subscribe", "sessions.messages.unsubscribe", "sessions.subscribe", "sessions.unsubscribe"], events: ["session.message", "session.tool", "chat"] },
               snapshot: {},

@@ -21,6 +21,17 @@ export function AppShell() {
 
   const { leftWidth, rightWidth, setLeftWidth, setRightWidth } = useLayoutWidths();
 
+  // In the Electron shell the native traffic lights overlay the top-left of the
+  // window; tag the root so CSS can reserve space for them and mark the title bar
+  // as a draggable region. No-op in the browser build.
+  useEffect(() => {
+    const w = window as unknown as { clawapp?: { isElectron?: boolean; platform?: string } };
+    if (!w.clawapp?.isElectron) return;
+    const root = document.documentElement;
+    root.classList.add("electron");
+    if (w.clawapp.platform === "darwin") root.classList.add("mac");
+  }, []);
+
   // Responsive window width
   const [winW, setWinW] = useState(typeof window !== "undefined" ? window.innerWidth : 1500);
   useEffect(() => {
@@ -118,27 +129,6 @@ export function AppShell() {
     }
   }, []);
 
-  const onNewChat = useCallback(async () => {
-    if (gatewayDown) return;
-    try {
-      const r = await fetch("/api/sessions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) });
-      if (!r.ok) return;
-      const j = await r.json();
-      setActive(j.id);
-      setRefreshNonce((n) => n + 1);
-    } catch { /* non-fatal */ }
-  }, [gatewayDown, setActive]);
-
-  const onDeleteSession = useCallback(async (id: string) => {
-    if (gatewayDown) return;
-    try {
-      const r = await fetch(`/api/sessions/${encodeURIComponent(id)}`, { method: "DELETE" });
-      if (!r.ok) return;
-      if (activeSessionId === id) setActive(null);
-      setRefreshNonce((n) => n + 1);
-    } catch { /* non-fatal */ }
-  }, [gatewayDown, activeSessionId, setActive]);
-
   const gridCols = [
     inlineLeft ? `${leftWidth}px` : "0px",
     inlineLeft ? "1px" : "0px",
@@ -170,10 +160,7 @@ export function AppShell() {
               pinnedIds={pinnedIds}
               onSelectSession={setActive}
               onTogglePin={togglePin}
-              onDeleteSession={onDeleteSession}
-              onNewChat={onNewChat}
               onCollapse={onToggleLeft}
-              newChatDisabled={gatewayDown}
               refreshNonce={refreshNonce}
             />
           </div>
@@ -194,6 +181,7 @@ export function AppShell() {
                 selectedAgent={selectedAgent}
                 onSelectAgent={setSelectedAgent}
                 composerDisabled={gatewayDown}
+                onTurnComplete={() => setRefreshNonce((n) => n + 1)}
               />
             ) : (
               <ChannelsComingSoon />
@@ -225,10 +213,7 @@ export function AppShell() {
               pinnedIds={pinnedIds}
               onSelectSession={(id) => { setActive(id); sidebars.setLeft(false); }}
               onTogglePin={togglePin}
-              onDeleteSession={onDeleteSession}
-              onNewChat={() => { void onNewChat(); sidebars.setLeft(false); }}
               onCollapse={() => sidebars.setLeft(false)}
-              newChatDisabled={gatewayDown}
               refreshNonce={refreshNonce}
             />
           </div>

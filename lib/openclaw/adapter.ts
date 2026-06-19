@@ -4,6 +4,8 @@ import { extractMessageText } from "./events";
 export type AdapterState = {
   /** Per-runId lastSeenText for computing chat-delta incremental. */
   runs: Record<string, string>;
+  /** Last assistant text observed through session.message when no runId is available. */
+  lastAssistantText?: string;
 };
 
 export function initialAdapterState(): AdapterState {
@@ -15,9 +17,10 @@ export function adaptTranscriptEvent(
   state: AdapterState,
 ): { out: StreamEvent[]; next: AdapterState } {
   if (ev.kind === "message") {
-    // session.message events are transcript-file writes; chat events already
-    // streamed the content. Ignore to avoid duplicate rendering.
-    return { out: [], next: state };
+    if (ev.data.message.role !== "assistant") return { out: [], next: state };
+    const text = extractMessageText(ev.data.message);
+    if (!text) return { out: [], next: state };
+    return { out: [{ type: "replace", text }], next: { ...state, lastAssistantText: text } };
   }
 
   if (ev.kind === "tool") {
@@ -44,7 +47,7 @@ export function adaptTranscriptEvent(
   // ev.kind === "chat"
   const c = ev.data;
   const runId = c.runId;
-  const prev = state.runs[runId] ?? "";
+  const prev = state.runs[runId] ?? state.lastAssistantText ?? "";
 
   if (c.state === "error") {
     const message = c.errorMessage ?? c.errorKind ?? "error";
@@ -58,15 +61,33 @@ export function adaptTranscriptEvent(
     return { out: [{ type: "error", message: "aborted" }], next };
   }
 
-  const accumulated = c.message ? extractMessageText(c.message as never) : "";
-  const incremental = accumulated.startsWith(prev) ? accumulated.slice(prev.length) : accumulated;
+  const snapshot = c.message ? extractMessageText(c.message as never) : "";
   const out: StreamEvent[] = [];
-  if (incremental.length > 0) out.push({ type: "token", text: incremental });
+
+  let nextText: string;
+  if (c.state === "delta" && typeof c.deltaText === "string") {
+    if (c.replace) {
+      out.push({ type: "replace", text: c.deltaText });
+      nextText = c.deltaText;
+    } else {
+      if (c.deltaText.length > 0) out.push({ type: "token", text: c.deltaText });
+      nextText = snapshot || prev + c.deltaText;
+    }
+  } else {
+    if (prev.length > 0 && !snapshot.startsWith(prev)) {
+      if (snapshot.length > 0) out.push({ type: "replace", text: snapshot });
+    } else {
+      const incremental = snapshot.slice(prev.length);
+      if (incremental.length > 0) out.push({ type: "token", text: incremental });
+    }
+    nextText = snapshot;
+  }
+
   if (c.state === "final") out.push({ type: "done" });
 
   const next = c.state === "final"
     ? (() => { const n = { runs: { ...state.runs } }; delete n.runs[runId]; return n; })()
-    : { runs: { ...state.runs, [runId]: accumulated } };
+    : { runs: { ...state.runs, [runId]: nextText } };
 
   return { out, next };
 }

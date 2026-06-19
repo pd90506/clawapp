@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const StreamEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("token"), text: z.string() }),
+  z.object({ type: z.literal("replace"), text: z.string() }),
   z.object({ type: z.literal("tool_call"), id: z.string(), name: z.string(), args: z.unknown() }),
   z.object({ type: z.literal("tool_result"), id: z.string(), result: z.unknown(), error: z.string().optional() }),
   z.object({ type: z.literal("thinking"), text: z.string() }),
@@ -60,6 +61,8 @@ const ChatEventSchema = z.object({
   seq: z.number(),
   state: z.enum(["delta", "final", "aborted", "error"]),
   message: TranscriptMessageSchema.optional(),
+  deltaText: z.string().optional(),
+  replace: z.boolean().optional(),
   stopReason: z.string().optional(),
   errorMessage: z.string().optional(),
   errorKind: z.enum(["refusal", "timeout", "rate_limit", "context_length", "unknown"]).optional(),
